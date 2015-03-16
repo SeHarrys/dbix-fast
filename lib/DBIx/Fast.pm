@@ -3,12 +3,13 @@ package DBIx::Fast;
 use strict;
 use warnings FATAL => 'all';
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 #use Carp 'croak';
 use Moo;
 use DBI;
 use DBIx::Connector;
+use DateTime::Format::MySQL;
 
 has db  => ( is => 'rw' );
 has sql => ( is => 'rw' );
@@ -149,6 +150,9 @@ sub update {
     my $self  = shift;
     my $table = shift;
     my $skeel = shift;
+
+    $skeel->{sen} = $self->extra_args($skeel->{sen},@_) if scalar @_ > 0;
+
     my @p;
 
     my $sql = "UPDATE $table SET ";
@@ -176,6 +180,9 @@ sub insert {
     my $self = shift;
     my $table = shift;
     my $skeel = shift;
+
+    $skeel = $self->extra_args($skeel,@_) if scalar @_ > 0;
+
     my @p;
 
     my $sql= "INSERT INTO $table ( ";
@@ -212,6 +219,23 @@ sub delete {
     $self->sql($sql);
 
     $self->execute_prepare(@p);
+}
+
+=doc
+    Extra Args :
+
+    time : NOW()
+=cut
+
+sub extra_args {
+    my $self  = shift;
+    my $skeel = shift;
+    my %args = @_;
+
+    $skeel->{$args{time}} = DateTime::Format::MySQL->format_datetime(DateTime->now)
+	if $args{time};
+
+    return $skeel;
 }
 
 ## FIXME : Hacer con execute_prepare
