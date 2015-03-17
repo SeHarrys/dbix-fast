@@ -157,7 +157,7 @@ sub update {
 
     my $sql = "UPDATE $table SET ";
 
-    for ( keys $skeel->{sen} ) {
+    for ( keys %{$skeel->{sen}} ) {
 	push @p,$skeel->{sen}->{$_};
 	$sql .= $_.' = ? ,';
     }
@@ -165,7 +165,7 @@ sub update {
     $sql =~ s/,$//;
     $sql .= 'WHERE ';
 
-    for my $K ( keys $skeel->{where} ) {
+    for my $K ( keys %{$skeel->{where}} ) {
 	push @p,$skeel->{where}->{$K};
 	$sql .= $K.' = ? ,';
     }
@@ -187,7 +187,7 @@ sub insert {
 
     my $sql= "INSERT INTO $table ( ";
 
-    for ( keys $skeel ) {
+    for ( keys %{$skeel} ) {
        push @p,$skeel->{$_};
        $sql .= $_.',';
     }
@@ -209,7 +209,7 @@ sub delete {
 
     my $sql = "DELETE FROM $table WHERE ";
 
-    for ( keys $skeel ) {
+    for ( keys %{$skeel} ) {
 	push @p,$skeel->{$_};
 	$sql .= $_.' = ? ,';
     }
@@ -246,7 +246,7 @@ sub make_sen {
     my @p;
 
     ## Ha de encontrar resultados por el orden de entrada parsear debidamente
-    for ( keys $skeel ) {
+    for ( keys %{$skeel} ) {
 	my $arg = ':'.$_;
 	push @p,$skeel->{$_};
 	$sql =~ s/$arg/\?/;
