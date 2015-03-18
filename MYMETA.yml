@@ -22,4 +22,4 @@ requires:
   DateTime::Format::MySQL: '0.04'
   Moo: '1'
   perl: '5.006'
-version: '0.03'
+version: '0.04'

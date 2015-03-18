@@ -3,13 +3,11 @@ package DBIx::Fast;
 use strict;
 use warnings FATAL => 'all';
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
-#use Carp 'croak';
 use Moo;
 use DBIx::Connector;
 use DateTime::Format::MySQL;
-use Data::Dumper;
 
 has db  => ( is => 'rw' );
 has sql => ( is => 'rw' );
@@ -34,23 +32,31 @@ sub set_error {
 
 sub BUILD {
     my ($self,$args) = @_;
+    my $dsn;
+
+    my $dbi_args = {
+	RaiseError => 0,
+	PrintError => 0,
+	AutoCommit => 1,
+    };
 
     $args->{host} = '127.0.0.1' unless $args->{host};
 
-    my $dsn = 'dbi:mysql:database='.$args->{db}.':'.$args->{host};
-
-    $dsn = 'dbi:sqlite:'.$args->{db} if $args->{host} eq 'sqlite';
-
-    $self->db(DBIx::Connector->new( $dsn, $args->{user}, $args->{passwd}
-				    ,{
-					RaiseError => 0,
-					PrintError => 0,
-					AutoCommit => 1,
-				    } )
-	);
-
     $args->{host} eq 'sqlite' ? $self->_set_dbd('sqlite') :
 	$self->_set_dbd('mysql');
+
+    if ( $self->dbd eq 'sqlite' ) {
+	$dsn = 'dbi:SQLite:'.$args->{db};
+	$self->db(DBIx::Connector->new( $dsn, $args->{user}, $args->{passwd},
+					$dbi_args ));
+    } else {
+	$dsn= 'dbi:mysql:database='.$args->{db}.':'.$args->{host};
+
+	$self->db(DBIx::Connector->new( $dsn, $args->{user}, $args->{passwd},
+					$dbi_args ));
+
+	$self->db->mode('ping');
+    }
 
     $self->db->dbh->{HandleError} = sub {
 	$self->set_error($DBI::err,$DBI::errstr);
@@ -59,8 +65,6 @@ sub BUILD {
     $self->db->dbh->trace($args->{trace},'dbix-fast-trace') if $args->{trace};
 
     $self->profile($args->{profile}) if $args->{profile};
-
-    $self->db->mode('ping');
 }
 
 =doc
@@ -117,25 +121,36 @@ sub count {
     my $self  = shift;
     my $table = shift;
     my $skeel = shift;
-    my @p;
-    my $sql = "SELECT COUNT(*) FROM $table";
+
+    $self->sql("SELECT COUNT(*) FROM $table");
 
     unless ( $skeel ) {
-	return $self->db->dbh->selectrow_array($sql);
+	return $self->db->dbh->selectrow_array($self->sql);
     }
 
-    $skeel->{action} //= '=';
+    $self->_make_where($skeel);
 
-    $sql .= " WHERE ";
+    return $self->db->dbh->selectrow_array($self->sql, undef, @{$self->p});
+}
 
-    for my $K ( keys %{$skeel->{where}} ) {
-	push @p,$skeel->{where}->{$K};
-	$sql .= qq{$K $skeel->{action} ? };
+sub _make_where {
+    my $self  = shift;
+    my $skeel = shift;
+    my @p;
+
+    my $sql = " WHERE ";
+
+    for my $K ( keys %{$skeel} ) {
+	#my $key = each %{$skeel->{$K}};
+	my $key = (keys %{$skeel->{$K}})[0];
+	push @p,$skeel->{$K}->{$key};
+	$sql .= qq{$K $key ? };
     }
 
     $sql =~ s/,$//;
 
-    return $self->db->dbh->selectrow_array($sql, undef, @p);
+    $self->sql($self->sql.$sql);
+    $self->p(\@p);
 }
 
 sub execute {
@@ -238,20 +253,17 @@ sub delete {
     my $self = shift;
     my $table = shift;
     my $skeel = shift;
-    my @p;
 
-    my $sql = "DELETE FROM $table WHERE ";
+    $self->sql("DELETE FROM $table");
 
-    for ( keys %{$skeel} ) {
-	push @p,$skeel->{$_};
-	$sql .= $_.' = ? ,';
-    }
+    #unless ( $skeel ) {
+    #    return $self->db->dbh->selectrow_array($self->sql);
+    #}
 
-    $sql =~ s/,$//;
+    $self->_make_where($skeel);
 
-    $self->sql($sql);
-
-    $self->execute_prepare(@p);
+    my $sth = $self->db->dbh->prepare($self->sql);
+    $sth->execute(@{$self->p});
 }
 
 =doc

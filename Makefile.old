@@ -19,11 +19,11 @@
 #     MIN_PERL_VERSION => q[5.006]
 #     NAME => q[DBIx::Fast]
 #     PL_FILES => {  }
-#     PREREQ_PM => { DBIx::Connector=>q[0.53], DateTime::Format::MySQL=>q[0.04], DBI=>q[1.6], Moo=>q[1], Test::More=>q[0] }
+#     PREREQ_PM => { Moo=>q[1], DateTime::Format::MySQL=>q[0.04], Test::More=>q[0], DBIx::Connector=>q[0.53] }
 #     TEST_REQUIRES => {  }
 #     VERSION_FROM => q[lib/DBIx/Fast.pm]
 #     clean => { FILES=>q[DBIx-Fast-*] }
-#     dist => { COMPRESS=>q[gzip -9f], SUFFIX=>q[gz] }
+#     dist => { SUFFIX=>q[gz], COMPRESS=>q[gzip -9f] }
 
 # --- MakeMaker post_initialize section:
 
@@ -62,11 +62,11 @@ DIRFILESEP = /
 DFSEP = $(DIRFILESEP)
 NAME = DBIx::Fast
 NAME_SYM = DBIx_Fast
-VERSION = 0.02
+VERSION = 0.03
 VERSION_MACRO = VERSION
-VERSION_SYM = 0_02
+VERSION_SYM = 0_03
 DEFINE_VERSION = -D$(VERSION_MACRO)=\"$(VERSION)\"
-XS_VERSION = 0.02
+XS_VERSION = 0.03
 XS_VERSION_MACRO = XS_VERSION
 XS_DEFINE_VERSION = -D$(XS_VERSION_MACRO)=\"$(XS_VERSION)\"
 INST_ARCHLIB = blib/arch
@@ -166,7 +166,7 @@ C_FILES  =
 O_FILES  = 
 H_FILES  = 
 MAN1PODS = 
-MAN3PODS = 
+MAN3PODS = lib/DBIx/Fast.pm
 
 # Where is the Config information that we are using/depend on
 CONFIGDEP = $(PERL_ARCHLIB)$(DFSEP)Config.pm $(PERL_INC)$(DFSEP)config.h
@@ -188,12 +188,9 @@ PERL_ARCHIVE       =
 PERL_ARCHIVE_AFTER = 
 
 
-TO_INST_PM = Teeo.pl \
-	lib/DBIx/Fast.pm
+TO_INST_PM = lib/DBIx/Fast.pm
 
-PM_TO_BLIB = Teeo.pl \
-	$(INST_LIB)/DBIx/Teeo.pl \
-	lib/DBIx/Fast.pm \
+PM_TO_BLIB = lib/DBIx/Fast.pm \
 	blib/lib/DBIx/Fast.pm
 
 
@@ -263,7 +260,7 @@ RCS_LABEL = rcs -Nv$(VERSION_SYM): -q
 DIST_CP = best
 DIST_DEFAULT = tardist
 DISTNAME = DBIx-Fast
-DISTVNAME = DBIx-Fast-0.02
+DISTVNAME = DBIx-Fast-0.03
 
 
 # --- MakeMaker macro section:
@@ -416,8 +413,10 @@ POD2MAN_EXE = $(PERLRUN) "-MExtUtils::Command::MM" -e pod2man "--"
 POD2MAN = $(POD2MAN_EXE)
 
 
-manifypods : pure_all 
-	$(NOECHO) $(NOOP)
+manifypods : pure_all  \
+	lib/DBIx/Fast.pm
+	$(NOECHO) $(POD2MAN) --section=$(MAN3EXT) --perm_rw=$(PERM_RW) \
+	  lib/DBIx/Fast.pm $(INST_MAN3DIR)/DBIx::Fast.$(MAN3EXT) 
 
 
 
@@ -444,22 +443,22 @@ clean_subdirs :
 
 clean :: clean_subdirs
 	- $(RM_F) \
-	  $(BASEEXT).x $(MAKE_APERL_FILE) \
-	  $(BASEEXT).exp mon.out \
-	  core.[0-9][0-9][0-9][0-9] pm_to_blib.ts \
-	  *perl.core MYMETA.json \
-	  blibdirs.ts perl \
-	  $(INST_ARCHAUTODIR)/extralibs.all perl$(EXE_EXT) \
-	  $(BASEEXT).bso perlmain.c \
-	  *$(OBJ_EXT) core.[0-9][0-9][0-9] \
-	  core.[0-9] $(INST_ARCHAUTODIR)/extralibs.ld \
-	  core pm_to_blib \
-	  core.*perl.*.? lib$(BASEEXT).def \
-	  *$(LIB_EXT) MYMETA.yml \
-	  core.[0-9][0-9][0-9][0-9][0-9] so_locations \
-	  perl.exe core.[0-9][0-9] \
-	  tmon.out $(BOOTSTRAP) \
-	  $(BASEEXT).def 
+	  core.[0-9][0-9][0-9][0-9][0-9] core.[0-9][0-9][0-9][0-9] \
+	  core.[0-9] $(BASEEXT).bso \
+	  lib$(BASEEXT).def *perl.core \
+	  $(MAKE_APERL_FILE) pm_to_blib.ts \
+	  perl.exe *$(OBJ_EXT) \
+	  *$(LIB_EXT) blibdirs.ts \
+	  $(BASEEXT).x perl$(EXE_EXT) \
+	  mon.out pm_to_blib \
+	  so_locations $(BASEEXT).exp \
+	  MYMETA.yml tmon.out \
+	  perl $(BOOTSTRAP) \
+	  perlmain.c core.[0-9][0-9] \
+	  MYMETA.json $(INST_ARCHAUTODIR)/extralibs.ld \
+	  core.*perl.*.? $(INST_ARCHAUTODIR)/extralibs.all \
+	  core $(BASEEXT).def \
+	  core.[0-9][0-9][0-9] 
 	- $(RM_RF) \
 	  DBIx-Fast-* blib 
 	- $(MV) $(FIRST_MAKEFILE) $(MAKEFILE_OLD) $(DEV_NULL)
@@ -502,12 +501,11 @@ metafile : create_distdir
 	$(NOECHO) $(ECHO) '    - t' >> META_new.yml
 	$(NOECHO) $(ECHO) '    - inc' >> META_new.yml
 	$(NOECHO) $(ECHO) 'requires:' >> META_new.yml
-	$(NOECHO) $(ECHO) '  DBI: '\''1.6'\''' >> META_new.yml
 	$(NOECHO) $(ECHO) '  DBIx::Connector: '\''0.53'\''' >> META_new.yml
 	$(NOECHO) $(ECHO) '  DateTime::Format::MySQL: '\''0.04'\''' >> META_new.yml
 	$(NOECHO) $(ECHO) '  Moo: '\''1'\''' >> META_new.yml
 	$(NOECHO) $(ECHO) '  perl: '\''5.006'\''' >> META_new.yml
-	$(NOECHO) $(ECHO) 'version: '\''0.02'\''' >> META_new.yml
+	$(NOECHO) $(ECHO) 'version: '\''0.03'\''' >> META_new.yml
 	-$(NOECHO) $(MV) META_new.yml $(DISTVNAME)/META.yml
 	$(NOECHO) $(ECHO) Generating META.json
 	$(NOECHO) $(ECHO) '{' > META_new.json
@@ -544,7 +542,6 @@ metafile : create_distdir
 	$(NOECHO) $(ECHO) '      },' >> META_new.json
 	$(NOECHO) $(ECHO) '      "runtime" : {' >> META_new.json
 	$(NOECHO) $(ECHO) '         "requires" : {' >> META_new.json
-	$(NOECHO) $(ECHO) '            "DBI" : "1.6",' >> META_new.json
 	$(NOECHO) $(ECHO) '            "DBIx::Connector" : "0.53",' >> META_new.json
 	$(NOECHO) $(ECHO) '            "DateTime::Format::MySQL" : "0.04",' >> META_new.json
 	$(NOECHO) $(ECHO) '            "Moo" : "1",' >> META_new.json
@@ -553,7 +550,7 @@ metafile : create_distdir
 	$(NOECHO) $(ECHO) '      }' >> META_new.json
 	$(NOECHO) $(ECHO) '   },' >> META_new.json
 	$(NOECHO) $(ECHO) '   "release_status" : "stable",' >> META_new.json
-	$(NOECHO) $(ECHO) '   "version" : "0.02"' >> META_new.json
+	$(NOECHO) $(ECHO) '   "version" : "0.03"' >> META_new.json
 	$(NOECHO) $(ECHO) '}' >> META_new.json
 	-$(NOECHO) $(MV) META_new.json $(DISTVNAME)/META.json
 
@@ -831,8 +828,7 @@ ppd :
 	$(NOECHO) $(ECHO) '    <AUTHOR>Harun Delgado &lt;hdp@nurmol.com&gt;</AUTHOR>' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '    <IMPLEMENTATION>' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '        <PERLCORE VERSION="5,006,0,0" />' >> $(DISTNAME).ppd
-	$(NOECHO) $(ECHO) '        <REQUIRE NAME="DBI::" VERSION="1.6" />' >> $(DISTNAME).ppd
-	$(NOECHO) $(ECHO) '        <REQUIRE VERSION="0.53" NAME="DBIx::Connector" />' >> $(DISTNAME).ppd
+	$(NOECHO) $(ECHO) '        <REQUIRE NAME="DBIx::Connector" VERSION="0.53" />' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '        <REQUIRE VERSION="0.04" NAME="DateTime::Format::MySQL" />' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '        <REQUIRE NAME="Moo::" VERSION="1" />' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '        <ARCHITECTURE NAME="x86_64-linux-gnu-thread-multi-5.18" />' >> $(DISTNAME).ppd
@@ -845,7 +841,6 @@ ppd :
 
 pm_to_blib : $(FIRST_MAKEFILE) $(TO_INST_PM)
 	$(NOECHO) $(ABSPERLRUN) -MExtUtils::Install -e 'pm_to_blib({@ARGV}, '\''$(INST_LIB)/auto'\'', q[$(PM_FILTER)], '\''$(PERM_DIR)'\'')' -- \
-	  Teeo.pl $(INST_LIB)/DBIx/Teeo.pl \
 	  lib/DBIx/Fast.pm blib/lib/DBIx/Fast.pm 
 	$(NOECHO) $(TOUCH) pm_to_blib
 
