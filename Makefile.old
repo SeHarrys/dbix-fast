@@ -19,11 +19,11 @@
 #     MIN_PERL_VERSION => q[5.006]
 #     NAME => q[DBIx::Fast]
 #     PL_FILES => {  }
-#     PREREQ_PM => { Moo=>q[1], DateTime::Format::MySQL=>q[0.04], Test::More=>q[0], DBIx::Connector=>q[0.53] }
+#     PREREQ_PM => { DBIx::Connector=>q[0.53], Test::More=>q[0], Moo=>q[1], DateTime::Format::MySQL=>q[0.04] }
 #     TEST_REQUIRES => {  }
 #     VERSION_FROM => q[lib/DBIx/Fast.pm]
 #     clean => { FILES=>q[DBIx-Fast-*] }
-#     dist => { SUFFIX=>q[gz], COMPRESS=>q[gzip -9f] }
+#     dist => { COMPRESS=>q[gzip -9f], SUFFIX=>q[gz] }
 
 # --- MakeMaker post_initialize section:
 
@@ -62,11 +62,11 @@ DIRFILESEP = /
 DFSEP = $(DIRFILESEP)
 NAME = DBIx::Fast
 NAME_SYM = DBIx_Fast
-VERSION = 0.03
+VERSION = 0.04
 VERSION_MACRO = VERSION
-VERSION_SYM = 0_03
+VERSION_SYM = 0_04
 DEFINE_VERSION = -D$(VERSION_MACRO)=\"$(VERSION)\"
-XS_VERSION = 0.03
+XS_VERSION = 0.04
 XS_VERSION_MACRO = XS_VERSION
 XS_DEFINE_VERSION = -D$(XS_VERSION_MACRO)=\"$(XS_VERSION)\"
 INST_ARCHLIB = blib/arch
@@ -260,7 +260,7 @@ RCS_LABEL = rcs -Nv$(VERSION_SYM): -q
 DIST_CP = best
 DIST_DEFAULT = tardist
 DISTNAME = DBIx-Fast
-DISTVNAME = DBIx-Fast-0.03
+DISTVNAME = DBIx-Fast-0.04
 
 
 # --- MakeMaker macro section:
@@ -443,22 +443,22 @@ clean_subdirs :
 
 clean :: clean_subdirs
 	- $(RM_F) \
-	  core.[0-9][0-9][0-9][0-9][0-9] core.[0-9][0-9][0-9][0-9] \
-	  core.[0-9] $(BASEEXT).bso \
-	  lib$(BASEEXT).def *perl.core \
-	  $(MAKE_APERL_FILE) pm_to_blib.ts \
-	  perl.exe *$(OBJ_EXT) \
-	  *$(LIB_EXT) blibdirs.ts \
-	  $(BASEEXT).x perl$(EXE_EXT) \
-	  mon.out pm_to_blib \
-	  so_locations $(BASEEXT).exp \
-	  MYMETA.yml tmon.out \
-	  perl $(BOOTSTRAP) \
-	  perlmain.c core.[0-9][0-9] \
-	  MYMETA.json $(INST_ARCHAUTODIR)/extralibs.ld \
-	  core.*perl.*.? $(INST_ARCHAUTODIR)/extralibs.all \
-	  core $(BASEEXT).def \
-	  core.[0-9][0-9][0-9] 
+	  perl core.*perl.*.? \
+	  core.[0-9][0-9] $(BASEEXT).bso \
+	  core.[0-9][0-9][0-9] $(BASEEXT).x \
+	  core.[0-9][0-9][0-9][0-9][0-9] perl.exe \
+	  perlmain.c core.[0-9] \
+	  $(MAKE_APERL_FILE) $(INST_ARCHAUTODIR)/extralibs.ld \
+	  mon.out MYMETA.yml \
+	  $(BASEEXT).exp $(BOOTSTRAP) \
+	  *perl.core blibdirs.ts \
+	  pm_to_blib.ts $(BASEEXT).def \
+	  *$(OBJ_EXT) tmon.out \
+	  so_locations lib$(BASEEXT).def \
+	  MYMETA.json core.[0-9][0-9][0-9][0-9] \
+	  pm_to_blib *$(LIB_EXT) \
+	  perl$(EXE_EXT) core \
+	  $(INST_ARCHAUTODIR)/extralibs.all 
 	- $(RM_RF) \
 	  DBIx-Fast-* blib 
 	- $(MV) $(FIRST_MAKEFILE) $(MAKEFILE_OLD) $(DEV_NULL)
@@ -473,7 +473,7 @@ realclean_subdirs :
 # Delete temporary files (via clean) and also delete dist files
 realclean purge ::  clean realclean_subdirs
 	- $(RM_F) \
-	  $(MAKEFILE_OLD) $(FIRST_MAKEFILE) 
+	  $(FIRST_MAKEFILE) $(MAKEFILE_OLD) 
 	- $(RM_RF) \
 	  $(DISTVNAME) 
 
@@ -505,7 +505,7 @@ metafile : create_distdir
 	$(NOECHO) $(ECHO) '  DateTime::Format::MySQL: '\''0.04'\''' >> META_new.yml
 	$(NOECHO) $(ECHO) '  Moo: '\''1'\''' >> META_new.yml
 	$(NOECHO) $(ECHO) '  perl: '\''5.006'\''' >> META_new.yml
-	$(NOECHO) $(ECHO) 'version: '\''0.03'\''' >> META_new.yml
+	$(NOECHO) $(ECHO) 'version: '\''0.04'\''' >> META_new.yml
 	-$(NOECHO) $(MV) META_new.yml $(DISTVNAME)/META.yml
 	$(NOECHO) $(ECHO) Generating META.json
 	$(NOECHO) $(ECHO) '{' > META_new.json
@@ -550,7 +550,7 @@ metafile : create_distdir
 	$(NOECHO) $(ECHO) '      }' >> META_new.json
 	$(NOECHO) $(ECHO) '   },' >> META_new.json
 	$(NOECHO) $(ECHO) '   "release_status" : "stable",' >> META_new.json
-	$(NOECHO) $(ECHO) '   "version" : "0.03"' >> META_new.json
+	$(NOECHO) $(ECHO) '   "version" : "0.04"' >> META_new.json
 	$(NOECHO) $(ECHO) '}' >> META_new.json
 	-$(NOECHO) $(MV) META_new.json $(DISTVNAME)/META.json
 
@@ -830,7 +830,7 @@ ppd :
 	$(NOECHO) $(ECHO) '        <PERLCORE VERSION="5,006,0,0" />' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '        <REQUIRE NAME="DBIx::Connector" VERSION="0.53" />' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '        <REQUIRE VERSION="0.04" NAME="DateTime::Format::MySQL" />' >> $(DISTNAME).ppd
-	$(NOECHO) $(ECHO) '        <REQUIRE NAME="Moo::" VERSION="1" />' >> $(DISTNAME).ppd
+	$(NOECHO) $(ECHO) '        <REQUIRE VERSION="1" NAME="Moo::" />' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '        <ARCHITECTURE NAME="x86_64-linux-gnu-thread-multi-5.18" />' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '        <CODEBASE HREF="" />' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '    </IMPLEMENTATION>' >> $(DISTNAME).ppd

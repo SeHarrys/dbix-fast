@@ -1,19 +1,19 @@
 #!perl -T
 use warnings FATAL => 'all';
 
-use Test::More tests => 12;
+use Test::More tests => 13;
 
 use DBIx::Fast;
 
 my $db = DBIx::Fast->new( db => 't/db/test.db', host => 'sqlite');
-##trace => '1' , profile => '!Statement:!MethodName' );
 
 $db->delete('test', { id => { '>' => 0 } });
 
-#for (qw(cc co ce)) { $d->execute('SELECT * FROM '.$_); }
-#print Dumper $d->errors;
+for (qw(be eb)) { $db->execute("SELECT * FROM $_"); }
 
-can_ok($db,qw(insert update delete q val count));
+is ref $db->errors,'ARRAY','Errors OK';
+
+can_ok($db,qw(insert update delete q val all hash array count));
 
 is_deeply $db->val('select count(*) from test'), 0, 'empty';
 is_deeply $db->count('test'), 0, 'empty';
@@ -34,6 +34,9 @@ $db->update('test',{ sen => { name => 'update test' },
 my $val = $db->val('select name from test where id = 1');
 
 like $val, qr/update test/, 'update tests';
+
+$db->array('SELECT * FROM test WHERE 1');
+is ref $db->results,'ARRAY','Results Array OK';
 
 $db->hash('SELECT * FROM test WHERE id = ? ',1);
 is_deeply ref $db->results, 'HASH','results hash';

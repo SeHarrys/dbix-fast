@@ -3,7 +3,7 @@ package DBIx::Fast;
 use strict;
 use warnings FATAL => 'all';
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 use Moo;
 use DBIx::Connector;
@@ -67,7 +67,7 @@ sub BUILD {
     $self->profile($args->{profile}) if $args->{profile};
 }
 
-=doc
+=head2 profile
     Save profile with the PID
 =cut
 sub profile {
@@ -79,7 +79,7 @@ sub profile {
     $self->db->dbh->{Profile} = $stat;
 }
 
-=doc Compatibility
+=head2 Compatibility
     scalar @_ > 1 ? $self->execute(@_,'arrayref') :
     $self->execute(@_,undef,'arrayref');
 =cut
@@ -108,13 +108,33 @@ sub hash {
     $self->results($res) unless $DBI::err;
 }
 
-# Return one value
+=head2 val
+    Return one value
+=cut
 sub val {
     my $self = shift;
 
     $self->q(@_);
 
     return $self->db->dbh->selectrow_array($self->sql, undef, @{$self->p});
+}
+
+=head2 array
+    Return array
+=cut
+sub array {
+    my $self = shift;
+
+    $self->q(@_);
+
+    my $sth = $self->db->dbh->prepare($self->sql);
+
+    $sth->execute(@{$self->p});
+
+    my @rows = @{ $self->db->dbh->selectcol_arrayref(
+		     $self->sql, undef, @{ $self->p } ) };
+
+    $self->results(\@rows) unless $DBI::err;
 }
 
 sub count {
@@ -266,7 +286,7 @@ sub delete {
     $sth->execute(@{$self->p});
 }
 
-=doc
+=head2 function
     Extra Args :
 
     time : NOW()
@@ -321,6 +341,10 @@ sub execute_prepare {
 
     $sth->execute(@p);
 }
+
+=head1 NAME
+
+    DBIx::Fast
 
 =head1 SYNOPSIS
 

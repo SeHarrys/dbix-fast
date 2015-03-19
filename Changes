@@ -1,5 +1,9 @@
 Revision history for DBIx-Fast
 
+0.05	mié mar 18 03:30:38 CET 2015
+	- More test
+	- Method : array
+
 0.04	mié mar 18 00:59:19 CET 2015
 	- Test
 
