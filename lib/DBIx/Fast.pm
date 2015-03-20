@@ -3,18 +3,20 @@ package DBIx::Fast;
 use strict;
 use warnings FATAL => 'all';
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 use Moo;
 use DBIx::Connector;
 use DateTime::Format::MySQL;
+use Data::Dumper;
+use feature qw(say);
 
 has db  => ( is => 'rw' );
 has sql => ( is => 'rw' );
 has p   => ( is => 'rw' );
 has last_id => ( is => 'rw');
 has results => ( is => 'rw');
-has errors => ( is => 'rw');
+has errors => ( is => 'rwp');
 has dbd => ( is => 'rwp');
 
 sub set_error {
@@ -27,7 +29,7 @@ sub set_error {
     my $Errors = $self->errors;
     push @{$Errors} ,$error;
 
-    $self->errors($Errors);
+    $self->_set_errors($Errors);
 }
 
 sub BUILD {
@@ -131,10 +133,12 @@ sub array {
 
     $sth->execute(@{$self->p});
 
-    my @rows = @{ $self->db->dbh->selectcol_arrayref(
-		     $self->sql, undef, @{ $self->p } ) };
+    unless ( $DBI::err ) {
+	my @rows = @{ $self->db->dbh->selectcol_arrayref(
+			  $self->sql, undef, @{ $self->p } ) };
 
-    $self->results(\@rows) unless $DBI::err;
+	$self->results(\@rows);
+    }
 }
 
 sub count {
@@ -161,9 +165,16 @@ sub _make_where {
     my $sql = " WHERE ";
 
     for my $K ( keys %{$skeel} ) {
-	#my $key = each %{$skeel->{$K}};
-	my $key = (keys %{$skeel->{$K}})[0];
-	push @p,$skeel->{$K}->{$key};
+	my $key;
+
+	if ( ref $skeel->{$K} eq 'HASH' ) {
+	    $key = (keys %{$skeel->{$K}})[0];
+	    push @p,$skeel->{$K}->{$key};
+	} else {
+	    $key = '=';
+	    push @p,$skeel->{$K};
+	}
+
 	$sql .= qq{$K $key ? };
     }
 

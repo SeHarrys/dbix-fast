@@ -1,7 +1,7 @@
 #!perl -T
 use warnings FATAL => 'all';
 
-use Test::More tests => 13;
+use Test::More tests => 16;
 
 use DBIx::Fast;
 
@@ -15,17 +15,17 @@ is ref $db->errors,'ARRAY','Errors OK';
 
 can_ok($db,qw(insert update delete q val all hash array count));
 
-is_deeply $db->val('select count(*) from test'), 0, 'empty';
-is_deeply $db->count('test'), 0, 'empty';
-is_deeply $db->count('test',
+is $db->val('select count(*) from test'), 0, 'empty';
+is $db->count('test'), 0, 'empty';
+is $db->count('test',
 		     {
 			 id  => { '>' => 999 },
 		     } ) , 0, 'empty count where';
 
-is_deeply $db->insert('test',{ name => 'test', status  => 1 }, time => 'time')
+is $db->insert('test',{ name => 'test', status  => 1 }, time => 'time')
     ,1,'empty';
 
-is_deeply $db->last_id,1,'last insert';
+is $db->last_id,1,'last insert';
 
 $db->update('test',{ sen => { name => 'update test' },
 		     where => { id => 1 },
@@ -39,14 +39,22 @@ $db->array('SELECT * FROM test WHERE 1');
 is ref $db->results,'ARRAY','Results Array OK';
 
 $db->hash('SELECT * FROM test WHERE id = ? ',1);
-is_deeply ref $db->results, 'HASH','results hash';
+is ref $db->results, 'HASH','results hash';
 
 like $db->results->{time}, qr//, 'time NOW()';
 
 $db->all('select * from test');
-is_deeply ref $db->results, 'ARRAY','results all';
+is ref $db->results, 'ARRAY','results all';
 
-is_deeply $db->delete('test', { id => { '=' => $db->last_id } }), 1,
+is $db->delete('test', { id => { '=' => $db->last_id } }), 1,
     'delete last_id';
+
+is $db->sql,'DELETE FROM test WHERE id = ? ','Delete ID Multi Args =';
+
+$db->delete('test', { id => { '>' => 999 } });
+is $db->sql,'DELETE FROM test WHERE id > ? ','Delete ID Multi Args >';
+
+$db->delete('test', { id => 999 } );
+is $db->sql,'DELETE FROM test WHERE id = ? ','Delete ID';
 
 done_testing();

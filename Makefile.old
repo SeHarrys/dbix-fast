@@ -19,7 +19,7 @@
 #     MIN_PERL_VERSION => q[5.006]
 #     NAME => q[DBIx::Fast]
 #     PL_FILES => {  }
-#     PREREQ_PM => { DBIx::Connector=>q[0.53], Test::More=>q[0], Moo=>q[1], DateTime::Format::MySQL=>q[0.04] }
+#     PREREQ_PM => { DateTime::Format::MySQL=>q[0.04], Test::More=>q[0], Moo=>q[1], DBIx::Connector=>q[0.53] }
 #     TEST_REQUIRES => {  }
 #     VERSION_FROM => q[lib/DBIx/Fast.pm]
 #     clean => { FILES=>q[DBIx-Fast-*] }
@@ -62,11 +62,11 @@ DIRFILESEP = /
 DFSEP = $(DIRFILESEP)
 NAME = DBIx::Fast
 NAME_SYM = DBIx_Fast
-VERSION = 0.04
+VERSION = 0.06
 VERSION_MACRO = VERSION
-VERSION_SYM = 0_04
+VERSION_SYM = 0_06
 DEFINE_VERSION = -D$(VERSION_MACRO)=\"$(VERSION)\"
-XS_VERSION = 0.04
+XS_VERSION = 0.06
 XS_VERSION_MACRO = XS_VERSION
 XS_DEFINE_VERSION = -D$(XS_VERSION_MACRO)=\"$(XS_VERSION)\"
 INST_ARCHLIB = blib/arch
@@ -188,10 +188,13 @@ PERL_ARCHIVE       =
 PERL_ARCHIVE_AFTER = 
 
 
-TO_INST_PM = lib/DBIx/Fast.pm
+TO_INST_PM = Teeo.pl \
+	lib/DBIx/Fast.pm
 
 PM_TO_BLIB = lib/DBIx/Fast.pm \
-	blib/lib/DBIx/Fast.pm
+	blib/lib/DBIx/Fast.pm \
+	Teeo.pl \
+	$(INST_LIB)/DBIx/Teeo.pl
 
 
 # --- MakeMaker platform_constants section:
@@ -260,7 +263,7 @@ RCS_LABEL = rcs -Nv$(VERSION_SYM): -q
 DIST_CP = best
 DIST_DEFAULT = tardist
 DISTNAME = DBIx-Fast
-DISTVNAME = DBIx-Fast-0.04
+DISTVNAME = DBIx-Fast-0.06
 
 
 # --- MakeMaker macro section:
@@ -443,24 +446,24 @@ clean_subdirs :
 
 clean :: clean_subdirs
 	- $(RM_F) \
-	  perl core.*perl.*.? \
-	  core.[0-9][0-9] $(BASEEXT).bso \
-	  core.[0-9][0-9][0-9] $(BASEEXT).x \
-	  core.[0-9][0-9][0-9][0-9][0-9] perl.exe \
-	  perlmain.c core.[0-9] \
-	  $(MAKE_APERL_FILE) $(INST_ARCHAUTODIR)/extralibs.ld \
-	  mon.out MYMETA.yml \
-	  $(BASEEXT).exp $(BOOTSTRAP) \
-	  *perl.core blibdirs.ts \
-	  pm_to_blib.ts $(BASEEXT).def \
-	  *$(OBJ_EXT) tmon.out \
-	  so_locations lib$(BASEEXT).def \
-	  MYMETA.json core.[0-9][0-9][0-9][0-9] \
-	  pm_to_blib *$(LIB_EXT) \
+	  $(MAKE_APERL_FILE) lib$(BASEEXT).def \
+	  $(BASEEXT).def *perl.core \
+	  core.[0-9][0-9] $(BOOTSTRAP) \
+	  core.*perl.*.? tmon.out \
+	  pm_to_blib.ts perl.exe \
+	  core.[0-9][0-9][0-9] core.[0-9] \
+	  perlmain.c $(INST_ARCHAUTODIR)/extralibs.ld \
+	  blibdirs.ts $(BASEEXT).bso \
+	  MYMETA.json MYMETA.yml \
+	  core.[0-9][0-9][0-9][0-9][0-9] $(INST_ARCHAUTODIR)/extralibs.all \
+	  core.[0-9][0-9][0-9][0-9] mon.out \
 	  perl$(EXE_EXT) core \
-	  $(INST_ARCHAUTODIR)/extralibs.all 
+	  pm_to_blib *$(OBJ_EXT) \
+	  so_locations $(BASEEXT).exp \
+	  *$(LIB_EXT) $(BASEEXT).x \
+	  perl 
 	- $(RM_RF) \
-	  DBIx-Fast-* blib 
+	  blib DBIx-Fast-* 
 	- $(MV) $(FIRST_MAKEFILE) $(MAKEFILE_OLD) $(DEV_NULL)
 
 
@@ -473,7 +476,7 @@ realclean_subdirs :
 # Delete temporary files (via clean) and also delete dist files
 realclean purge ::  clean realclean_subdirs
 	- $(RM_F) \
-	  $(FIRST_MAKEFILE) $(MAKEFILE_OLD) 
+	  $(MAKEFILE_OLD) $(FIRST_MAKEFILE) 
 	- $(RM_RF) \
 	  $(DISTVNAME) 
 
@@ -505,7 +508,7 @@ metafile : create_distdir
 	$(NOECHO) $(ECHO) '  DateTime::Format::MySQL: '\''0.04'\''' >> META_new.yml
 	$(NOECHO) $(ECHO) '  Moo: '\''1'\''' >> META_new.yml
 	$(NOECHO) $(ECHO) '  perl: '\''5.006'\''' >> META_new.yml
-	$(NOECHO) $(ECHO) 'version: '\''0.04'\''' >> META_new.yml
+	$(NOECHO) $(ECHO) 'version: '\''0.06'\''' >> META_new.yml
 	-$(NOECHO) $(MV) META_new.yml $(DISTVNAME)/META.yml
 	$(NOECHO) $(ECHO) Generating META.json
 	$(NOECHO) $(ECHO) '{' > META_new.json
@@ -550,7 +553,7 @@ metafile : create_distdir
 	$(NOECHO) $(ECHO) '      }' >> META_new.json
 	$(NOECHO) $(ECHO) '   },' >> META_new.json
 	$(NOECHO) $(ECHO) '   "release_status" : "stable",' >> META_new.json
-	$(NOECHO) $(ECHO) '   "version" : "0.04"' >> META_new.json
+	$(NOECHO) $(ECHO) '   "version" : "0.06"' >> META_new.json
 	$(NOECHO) $(ECHO) '}' >> META_new.json
 	-$(NOECHO) $(MV) META_new.json $(DISTVNAME)/META.json
 
@@ -829,7 +832,7 @@ ppd :
 	$(NOECHO) $(ECHO) '    <IMPLEMENTATION>' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '        <PERLCORE VERSION="5,006,0,0" />' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '        <REQUIRE NAME="DBIx::Connector" VERSION="0.53" />' >> $(DISTNAME).ppd
-	$(NOECHO) $(ECHO) '        <REQUIRE VERSION="0.04" NAME="DateTime::Format::MySQL" />' >> $(DISTNAME).ppd
+	$(NOECHO) $(ECHO) '        <REQUIRE NAME="DateTime::Format::MySQL" VERSION="0.04" />' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '        <REQUIRE VERSION="1" NAME="Moo::" />' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '        <ARCHITECTURE NAME="x86_64-linux-gnu-thread-multi-5.18" />' >> $(DISTNAME).ppd
 	$(NOECHO) $(ECHO) '        <CODEBASE HREF="" />' >> $(DISTNAME).ppd
@@ -841,7 +844,8 @@ ppd :
 
 pm_to_blib : $(FIRST_MAKEFILE) $(TO_INST_PM)
 	$(NOECHO) $(ABSPERLRUN) -MExtUtils::Install -e 'pm_to_blib({@ARGV}, '\''$(INST_LIB)/auto'\'', q[$(PM_FILTER)], '\''$(PERM_DIR)'\'')' -- \
-	  lib/DBIx/Fast.pm blib/lib/DBIx/Fast.pm 
+	  lib/DBIx/Fast.pm blib/lib/DBIx/Fast.pm \
+	  Teeo.pl $(INST_LIB)/DBIx/Teeo.pl 
 	$(NOECHO) $(TOUCH) pm_to_blib
 
 
