@@ -1,7 +1,7 @@
 #!perl -T
 use warnings FATAL => 'all';
 
-use Test::More tests => 16;
+use Test::More tests => 17;
 
 use DBIx::Fast;
 
@@ -27,11 +27,17 @@ is $db->insert('test',{ name => 'test', status  => 1 }, time => 'time')
 
 is $db->last_id,1,'last insert';
 
-$db->update('test',{ sen => { name => 'update test' },
+$db->update('test',{ sen => { name => 'update t3st' },
 		     where => { id => 1 },
 	    }, time => 'time' );
 
 my $val = $db->val('select name from test where id = 1');
+
+like $val, qr/update t3st/, 'update tests';
+
+$db->up('test', { name => 'update test' }, { id => 1 }, time => 'time' );
+
+$val = $db->val('select name from test where id = ?',1);
 
 like $val, qr/update test/, 'update tests';
 
@@ -56,5 +62,8 @@ is $db->sql,'DELETE FROM test WHERE id > ? ','Delete ID Multi Args >';
 
 $db->delete('test', { id => 999 } );
 is $db->sql,'DELETE FROM test WHERE id = ? ','Delete ID';
+
+#$db->hash('SELECT id FROM test WHERE id > 1');
+#like $db->results->{time}, qr//, 'time NOW()';
 
 done_testing();

@@ -1,5 +1,9 @@
 Revision history for DBIx-Fast
 
+0.07	24/01/16
+	
+0.06	23/03/15
+
 0.05	mié mar 18 03:30:38 CET 2015
 	- More test
 	- Method : array
@@ -14,5 +18,4 @@ Revision history for DBIx-Fast
 0.02	mar mar 17 00:20:48 CET 2015
 	- extra_args -> time NOW()
 
-0.01    Date/time
-        - First version, released on an unsuspecting world.
+0.01
