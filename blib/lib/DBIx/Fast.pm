@@ -6,7 +6,7 @@ DBIx::Fast - DBI fast & easy (another one...)
    
 =cut
 
-our $VERSION = '0.10';
+our $VERSION = '0.09';
 
 use strict;
 use warnings FATAL => 'all';
