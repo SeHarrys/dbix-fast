@@ -135,8 +135,6 @@ sub BUILD {
     my ($self,$args) = @_;
     my $DConf;
 
-    $self->Exception("DBD Driver : Not defined") unless $args->{driver};
-
     $args->{host} = '127.0.0.1' unless $args->{host};
 
     $DConf->{args} = {
@@ -149,7 +147,6 @@ sub BUILD {
     
     $self->_set_dsn($args->{dsn} ? $self->_check_dsn($args->{dsn}) : $self->_make_dsn($args));
     $self->_set_dbi_args($DConf);
-
     
     if ( $self->dbd eq 'mysql' ) {
 	$DConf->{args}->{mysql_enable_utf8} = 1 if $args->{mysql_enable_utf8};
@@ -204,6 +201,8 @@ sub _check_dsn {
 sub _make_dsn {
     my $self = shift;
     my $args = shift;
+
+    $self->Exception("DBD Driver : Not defined") unless $args->{driver};
 
     $self->_Driver_dbd($args->{driver});
 
