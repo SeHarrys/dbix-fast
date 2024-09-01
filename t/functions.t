@@ -1,10 +1,9 @@
 #!perl -T
+use strict;
 use warnings FATAL => 'all';
 
 use Test::More tests => 16;
-
 use DBIx::Fast;
-use Data::Dumper;
 
 my $db = DBIx::Fast->new(
     db     => 't/db/test.db',

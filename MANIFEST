@@ -11,6 +11,7 @@ t/functions.t
 t/methods.t
 t/pod-coverage.t
 t/pod.t
+t/sql-abstract.t
 t/x_log.t
 META.yml                                 Module YAML meta-data (added by MakeMaker)
 META.json                                Module JSON meta-data (added by MakeMaker)

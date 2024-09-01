@@ -18,6 +18,7 @@ WriteMakefile(
 	'Test::More' => 0,
     },
     PREREQ_PM => {
+	'SQL::Abstract'   => 2.00,
 	'DBIx::Connector' => 0.53,
 	'Moo' => 1,
     },

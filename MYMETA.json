@@ -34,6 +34,7 @@
          "requires" : {
             "DBIx::Connector" : "0.53",
             "Moo" : "1",
+            "SQL::Abstract" : "2",
             "perl" : "5.006"
          }
       }

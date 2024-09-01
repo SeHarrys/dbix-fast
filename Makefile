@@ -19,7 +19,7 @@
 #     MIN_PERL_VERSION => q[5.006]
 #     NAME => q[DBIx::Fast]
 #     PL_FILES => {  }
-#     PREREQ_PM => { DBIx::Connector=>q[0.53], Moo=>q[1], Test::More=>q[0] }
+#     PREREQ_PM => { DBIx::Connector=>q[0.53], Moo=>q[1], SQL::Abstract=>q[2], Test::More=>q[0] }
 #     TEST_REQUIRES => {  }
 #     VERSION_FROM => q[lib/DBIx/Fast.pm]
 #     clean => { FILES=>q[DBIx-Fast-*] }
@@ -63,11 +63,11 @@ DIRFILESEP = /
 DFSEP = $(DIRFILESEP)
 NAME = DBIx::Fast
 NAME_SYM = DBIx_Fast
-VERSION = 0.10
+VERSION = 0.11
 VERSION_MACRO = VERSION
-VERSION_SYM = 0_10
+VERSION_SYM = 0_11
 DEFINE_VERSION = -D$(VERSION_MACRO)=\"$(VERSION)\"
-XS_VERSION = 0.10
+XS_VERSION = 0.11
 XS_VERSION_MACRO = XS_VERSION
 XS_DEFINE_VERSION = -D$(XS_VERSION_MACRO)=\"$(XS_VERSION)\"
 INST_ARCHLIB = blib/arch
@@ -264,7 +264,7 @@ RCS_LABEL = rcs -Nv$(VERSION_SYM): -q
 DIST_CP = best
 DIST_DEFAULT = tardist
 DISTNAME = DBIx-Fast
-DISTVNAME = DBIx-Fast-0.10
+DISTVNAME = DBIx-Fast-0.11
 
 
 # --- MakeMaker macro section:
@@ -507,8 +507,9 @@ metafile : create_distdir
 	$(NOECHO) $(ECHO) 'requires:' >> META_new.yml
 	$(NOECHO) $(ECHO) '  DBIx::Connector: '\''0.53'\''' >> META_new.yml
 	$(NOECHO) $(ECHO) '  Moo: '\''1'\''' >> META_new.yml
+	$(NOECHO) $(ECHO) '  SQL::Abstract: '\''2'\''' >> META_new.yml
 	$(NOECHO) $(ECHO) '  perl: '\''5.006'\''' >> META_new.yml
-	$(NOECHO) $(ECHO) 'version: '\''0.10'\''' >> META_new.yml
+	$(NOECHO) $(ECHO) 'version: '\''0.11'\''' >> META_new.yml
 	$(NOECHO) $(ECHO) 'x_serialization_backend: '\''CPAN::Meta::YAML version 0.018'\''' >> META_new.yml
 	-$(NOECHO) $(MV) META_new.yml $(DISTVNAME)/META.yml
 	$(NOECHO) $(ECHO) Generating META.json
@@ -548,12 +549,13 @@ metafile : create_distdir
 	$(NOECHO) $(ECHO) '         "requires" : {' >> META_new.json
 	$(NOECHO) $(ECHO) '            "DBIx::Connector" : "0.53",' >> META_new.json
 	$(NOECHO) $(ECHO) '            "Moo" : "1",' >> META_new.json
+	$(NOECHO) $(ECHO) '            "SQL::Abstract" : "2",' >> META_new.json
 	$(NOECHO) $(ECHO) '            "perl" : "5.006"' >> META_new.json
 	$(NOECHO) $(ECHO) '         }' >> META_new.json
 	$(NOECHO) $(ECHO) '      }' >> META_new.json
 	$(NOECHO) $(ECHO) '   },' >> META_new.json
 	$(NOECHO) $(ECHO) '   "release_status" : "stable",' >> META_new.json
-	$(NOECHO) $(ECHO) '   "version" : "0.10",' >> META_new.json
+	$(NOECHO) $(ECHO) '   "version" : "0.11",' >> META_new.json
 	$(NOECHO) $(ECHO) '   "x_serialization_backend" : "JSON::PP version 4.16"' >> META_new.json
 	$(NOECHO) $(ECHO) '}' >> META_new.json
 	-$(NOECHO) $(MV) META_new.json $(DISTVNAME)/META.json
@@ -863,13 +865,14 @@ testdb_static :: static pure_all
 # --- MakeMaker ppd section:
 # Creates a PPD (Perl Package Description) for a binary distribution.
 ppd :
-	$(NOECHO) $(ECHO) '<SOFTPKG NAME="DBIx-Fast" VERSION="0.10">' > DBIx-Fast.ppd
+	$(NOECHO) $(ECHO) '<SOFTPKG NAME="DBIx-Fast" VERSION="0.11">' > DBIx-Fast.ppd
 	$(NOECHO) $(ECHO) '    <ABSTRACT>DBI fast & easy (another one...)</ABSTRACT>' >> DBIx-Fast.ppd
 	$(NOECHO) $(ECHO) '    <AUTHOR>Harun Delgado &lt;hdp@nurmol.com&gt;</AUTHOR>' >> DBIx-Fast.ppd
 	$(NOECHO) $(ECHO) '    <IMPLEMENTATION>' >> DBIx-Fast.ppd
 	$(NOECHO) $(ECHO) '        <PERLCORE VERSION="5,006,0,0" />' >> DBIx-Fast.ppd
 	$(NOECHO) $(ECHO) '        <REQUIRE NAME="DBIx::Connector" VERSION="0.53" />' >> DBIx-Fast.ppd
 	$(NOECHO) $(ECHO) '        <REQUIRE NAME="Moo::" VERSION="1" />' >> DBIx-Fast.ppd
+	$(NOECHO) $(ECHO) '        <REQUIRE NAME="SQL::Abstract" VERSION="2" />' >> DBIx-Fast.ppd
 	$(NOECHO) $(ECHO) '        <ARCHITECTURE NAME="darwin-2level-5.38" />' >> DBIx-Fast.ppd
 	$(NOECHO) $(ECHO) '        <CODEBASE HREF="" />' >> DBIx-Fast.ppd
 	$(NOECHO) $(ECHO) '    </IMPLEMENTATION>' >> DBIx-Fast.ppd
