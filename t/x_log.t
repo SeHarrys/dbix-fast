@@ -5,7 +5,14 @@ use Test::More tests => 2;
 use DBIx::Fast;
 use Cwd 'abs_path';
 
-my $db = DBIx::Fast->new( db => 't/db/test.db', host => 'sqlite' , trace => '1' , profile => '!Statement:!MethodName' );
+my $db = DBIx::Fast->new(
+    db     => 't/db/test.db',
+    driver => 'SQLite',
+    Error  => 0,
+    PrintError => 0,
+    trace => 1,
+    profile => '!Statement:!MethodName'
+    );
 
 my $log   = abs_path($db->db->dbh->{Profile}->{File});
 my $trace = abs_path('dbix-fast-trace');

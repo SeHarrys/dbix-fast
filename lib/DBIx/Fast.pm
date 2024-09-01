@@ -2,39 +2,43 @@ package DBIx::Fast;
 
 =head1 NAME
  
-    DBIx::Fast - DBI fast & easy (another one...)
-
+DBIx::Fast - DBI fast & easy (another one...)
+   
 =cut
 
-our $VERSION = '0.07';
+our $VERSION = '0.09';
 
 use strict;
 use warnings FATAL => 'all';
- 
+
 =head1 SYNOPSIS
  
-    $db = DBIx::Fast->new( db => 'test' , user => 'test' , passwd => 'test');
- 
-    $db = DBIx::Fast->new( db => 'test' , user => 'test' , passwd => 'test', trace => '1' , profile => '!Statement:!MethodName' );
- 
-    $db = DBIx::Fast->new( dsn => 'dbi:mysql:database=test:127.0.0.1' , user => 'test', passwd => 'text');
+use DBIx::Fast;
 
-    $hash = $db->hash('SELECT * FROM users WHERE id = ?',$id);
+$DB = DBIx::Fast->new( dsn => 'dbi:MariaDB:database=test:host' , user => 'test' , passwd => 'test');
 
-    $arrayref = $db->all('SELECT * FROM users');
+$DB = DBIx::Fast->new( db => 'test', user => 'test', passwd => 'test', driver => 'MariaDB' );
 
-    $db->insert( { user => 'test' } , table => 'users' , time => 'date_add' );
+$DB = DBIx::Fast->new( db => 'test', user => 'test', passwd => 'test', driver => 'mysql', trace => '1' , profile => '!Statement:!MethodName' );
 
-    $db->delete('test', { id => $db->last_id });
+say $DB->last_error;
+Dumper $DB->errors;
 
-    Fast.. ?
-    $db->update('test',{ sen => { name => 'update t3st' }, where => { id => 1 } }, time => 'time' );
+$DB->all('SELECT * FROM test WHERE 1');
 
-    $db->up('test', { name => 'update test' } , { id => 1 } );
+$Results = $DB->results;
+$Results = $DB->all('SELECT * FROM test WHERE expire > ?',$time);
 
-    $db->last_sql
+$Hash = $DB->hash('SELECT * FROM test WHERE id = ?',$id);
+$Hash = $DB->results;
 
-    $db->results
+$Value = $DB->val('SELECT name FROM test WHERE id = ?',1);
+
+$DB->insert('table', { name => 'New Name', status  => 1 }, time => 'create_time');
+$DB->update('table', { sen => { name => 'update t3st' }, where => { id => 1 } }, time => 'mod_time');
+
+say $DB->last_sql;
+say $DB->last_id;
 
 =head1 DESCRIPTION
 
@@ -44,24 +48,68 @@ use warnings FATAL => 'all';
 
 use Carp;
 use Moo;
-use DBIx::Connector;
-use DateTime::Format::MySQL;
 
+use DBI;
+use DBIx::Connector;
+
+=head2 db
+ Database
+=cut
 has db  => ( is => 'rw' );
+
+=head2 dbd
+ Database type
+=cut
 has dbd => ( is => 'rwp');
 
+=head2 errors
+ Array with all errors
+=cut
 has errors   => ( is => 'rwp');
 
+=head2 last_error
+ String with the last error
+=cut
+has last_error => ( is => 'rwp' );
+
+=head2 last_sql
+ Return last SQL sentence
+=cut
 has last_sql => ( is => 'rw');
+
+=head2 last_id
+ Return last insert id
+=cut
 has last_id  => ( is => 'rw');
 
 has sql => ( is => 'rw' );
-
 has p   => ( is => 'rw' );
 
+=head2 results
+ Last fetch results
+=cut
 has results  => ( is => 'rw');
 
-=head2
+=head2 dsn
+=cut
+has dsn => ( is => 'rwp' );
+
+=head2 dbi_args
+=cut
+has dbi_args => ( is => 'rwp' );
+
+=head2 now
+  NOW() - Timestamp
+=cut
+sub now {
+    my $self = shift;
+
+    my ($sec, $min, $hour, $mday, $mon , $year) = localtime;
+
+    return sprintf("%04d-%02d-%02d %02d:%02d:%02d",$year + 1900, $mon + 1, $mday, $hour, $min, $sec);
+}
+
+=head2 set_error
     Add error to the array
 =cut
 sub set_error {
@@ -76,6 +124,7 @@ sub set_error {
     my $Errors = $self->errors;
     push @{$Errors} ,$error;
 
+    $self->_set_last_error(qq{$error->{time} - [$error->{id}] - $error->{error}});
     $self->_set_errors($Errors);
 }
 
@@ -84,28 +133,55 @@ sub set_error {
 =cut
 sub BUILD {
     my ($self,$args) = @_;
-    
-    my $dbi_args = {
-	RaiseError => 0 // $args->{Error},
-	PrintError => 0 // $args->{PrintError},
-	AutoCommit => 1,
+    my $DConf;
+
+    $self->Exception("DBD Driver : Not defined") unless $args->{driver};
+
+    $args->{host} = '127.0.0.1' unless $args->{host};
+
+    $DConf->{args} = {
+	RaiseError => $args->{Error} // 1,
+	PrintError => $args->{PrintError} // 1,
+	AutoCommit => $args->{AutoCommit} // 1,
     };
 
-    my $dsn = $args->{dsn} ? $self->_check_dsn($args->{dsn}) : $self->_make_dsn($args);
-
-    $self->db(DBIx::Connector->new( $dsn, 
-				    $args->{user}, $args->{passwd},
-				    $dbi_args ));
+    $DConf->{quote} = $args->{quote} if $args->{quote};
     
-    $self->db->mode('ping');
+    $self->_set_dsn($args->{dsn} ? $self->_check_dsn($args->{dsn}) : $self->_make_dsn($args));
+    $self->_set_dbi_args($DConf);
 
+    
+    if ( $self->dbd eq 'mysql' ) {
+	$DConf->{args}->{mysql_enable_utf8} = 1 if $args->{mysql_enable_utf8};
+    }
+    
+    $self->_set_dbi_args($DConf);
+    $self->db(DBIx::Connector->new( $self->dsn, 
+				    $args->{user}, $args->{passwd},
+				    $self->dbi_args->{args} ));
+
+    $self->db->mode('ping');
+    
+    $self->db->dbh->quote($self->dbi_args->{quote}) if $self->dbi_args->{quote};
+    
     $self->db->dbh->{HandleError} = sub {
 	$self->set_error($DBI::err,$DBI::errstr);
     };
 
     $self->db->dbh->trace($args->{trace},'dbix-fast-trace') if $args->{trace};
 
-    $self->profile($args->{profile}) if $args->{profile};
+    $self->_profile($args->{profile}) if $args->{profile};
+}
+
+=head2 _Driver_dbd
+=cut
+sub _Driver_dbd {
+    my $self = shift;
+    my $dbd  = shift;
+    
+    map { $self->_set_dbd($_) if lc($dbd) eq lc($_) } qw(SQLite Pg MariaDB mysql);
+
+    $self->Exception("Error DBD Driver : $dbd") unless $self->dbd;
 }
 
 =head2 check_dsn
@@ -115,16 +191,11 @@ sub _check_dsn {
     my $self = shift;
     my $dsn  = shift;
 
-    my ($dbi,$server,$db,$host) = split ':', $dsn;
-
-    #$self->_set_dbd(lc($server));
+    my ($dbi,$driver,$db,$host) = split ':', $dsn;
     
-    if ( $server eq 'sqlite' ) {
-        $self->_set_dbd('sqlite');
-    } else {
-	$self->_set_dbd('mysql');
-    }
-	  
+    $self->_Driver_dbd($driver);
+
+    return $dsn;
 }
 
 =head2 make_dsn
@@ -133,21 +204,18 @@ sub _check_dsn {
 sub _make_dsn {
     my $self = shift;
     my $args = shift;
+
+    $self->_Driver_dbd($args->{driver});
+
+    return 'dbi:SQLite:dbname='.$args->{db} if $args->{driver} eq 'SQLite';
     
-    if ( $args->{host} =~ 'sqlite' ) {
-	$self->_set_dbd('sqlite');
-	return 'dbi:SQLite:'.$args->{db};
-    } else {
-	$self->_set_dbd('mysql');
-	$args->{host} = '127.0.0.1' unless $args->{host};
-	return 'dbi:mysql:database='.$args->{db}.':'.$args->{host};
-    }
+    return 'dbi:'.$self->dbd.':database='.$args->{db}.':'.$args->{host};
 }
 
 =head2 profile
     Save profile log : dbix-fast--PID.log
 =cut
-sub profile {
+sub _profile {
     my $self = shift;
     my $stat = shift."/DBI::ProfileDumper/";
 
@@ -167,7 +235,9 @@ sub all {
     my $res = $self->db->dbh->selectall_arrayref($self->sql,
 						 { Slice => {} },@{$self->p});
 
-    $self->results($res) unless $DBI::err;
+    $self->Exception("ERROR all()") if $DBI::err;
+    
+    $self->results($res);
 }
 
 =head2 hash
@@ -184,7 +254,9 @@ sub hash {
 
     my $res = $sth->fetchrow_hashref;
 
-    $self->results($res) unless $DBI::err;
+    $self->Exception("hash()") if $DBI::err;
+    
+    $self->results($res);
 }
 
 =head2 val
@@ -210,12 +282,11 @@ sub array {
 
     $sth->execute(@{$self->p});
 
-    unless ( $DBI::err ) {
-	my @rows = @{ $self->db->dbh->selectcol_arrayref(
-			  $self->sql, undef, @{ $self->p } ) };
+    $self->Exception("array()") if $DBI::err;
 
-	$self->results(\@rows);
-    }
+    my @rows = @{ $self->db->dbh->selectcol_arrayref( $self->sql, undef, @{ $self->p } ) };
+    
+    $self->results(\@rows);
 }
 
 =head2 count
@@ -223,7 +294,7 @@ sub array {
 =cut
 sub count {
     my $self  = shift;
-    my $table = shift;
+    my $table = $self->TableName(shift);
     my $skeel = shift;
 
     $self->sql("SELECT COUNT(*) FROM $table");
@@ -299,10 +370,9 @@ sub execute {
 	}
     }
 
-    unless ( $DBI::err ) {
-	$self->results($res);
-    }
-
+    $self->Exception("execute()") if $DBI::err;
+    
+    $self->results($res);
 }
 
 =head2 up
@@ -311,21 +381,27 @@ sub execute {
 sub up {
     my ($self,$table,$data,$where,$time) = @_;
 
-    $self->update($table,{ sen => $data , where => $where } );
+    if ( $time ) {
+	$self->update( $self->TableName($table) , { sen => $data , where => $where } , time => $time );
+    } else {
+	$self->update( $self->TableName($table) , { sen => $data , where => $where } );
+    }
 }
 
 =head2 update
-    Update statment
+        $d->update('test', {
+                           sen   => { uid => 1 , name => 'mrtest' ,status => 1 },
+                           where => { id => 33 },
+        }, time => 'update_time');
 =cut
 sub update {
     my $self  = shift;
-    my $table = shift;
+    my $table = $self->TableName(shift);
     my $skeel = shift;
 
     $skeel->{sen} = $self->extra_args($skeel->{sen},@_) if scalar @_ > 0;
 
     my @p;
-
     my $sql = "UPDATE $table SET ";
 
     for ( keys %{$skeel->{sen}} ) {
@@ -348,11 +424,15 @@ sub update {
 }
 
 =head2 insert
-    Insert data
+        $d->insert('test',
+           {
+               name => 'tester',
+               status => 0
+           }, time => 'date' );
 =cut
 sub insert {
     my $self  = shift;
-    my $table = shift;
+    my $table = $self->TableName(shift);
     my $skeel = shift;
 
     $skeel = $self->extra_args($skeel,@_) if scalar @_ > 0;
@@ -372,20 +452,24 @@ sub insert {
     $self->sql($sql);
     $self->execute_prepare(@p);
 
-    if ( $self->dbd eq 'mysql' ) {
+    if ( $self->dbd eq 'MariaDB' ) {
+	$self->last_id($self->db->dbh->{mariadb_insertid});
+    } elsif ( $self->dbd eq 'mysql' ) {
 	$self->last_id($self->db->dbh->{mysql_insertid});
-    } elsif ( $self->dbd eq 'sqlite' ) {
+    } elsif ( $self->dbd eq 'SQLite' ) {
 	$self->last_id($self->db->dbh->sqlite_last_insert_rowid());
+    } elsif ( $self->dbd eq 'Pg' ) {
+	$self->last_id($self->db->dbh->last_insert_id(undef,undef,$table,undef));
     }
-
 }
 
 =head2 delete
-    Delete
+   $d->delete('test', { id => $d->last_id });
+   $d->delete('test', { id => 1 });
 =cut
 sub delete {
     my $self  = shift;
-    my $table = shift;
+    my $table = $self->TableName(shift);
     my $skeel = shift;
 
     $self->sql("DELETE FROM $table");
@@ -397,6 +481,7 @@ sub delete {
     $self->_make_where($skeel);
 
     my $sth = $self->db->dbh->prepare($self->sql);
+    
     $sth->execute(@{$self->p});
 }
 
@@ -408,13 +493,12 @@ sub extra_args {
     my $skeel = shift;
     my %args  = @_;
 
-    $skeel->{$args{time}} = DateTime::Format::MySQL->format_datetime(DateTime->now)
-	if $args{time};
-
+    $skeel->{$args{time}} = $self->now() if $args{time};
+    
     return $skeel;
 }
 
-=head2
+=head2 make_sen
     FIXME : Hacer con execute_prepare
 =cut
 sub make_sen {
@@ -463,7 +547,35 @@ sub execute_prepare {
 
     $self->last_sql($self->sql);
 }
+
+=head2
+    Table name any character or _
+=cut
+sub TableName {
+    my $self  = shift;
+    my $table = shift;
+
+    return $table unless $table =~ /\W/;
+
+    $self->Exception("TableName not valid: $table");
+}
+
+=head2
+    Excepcion
+=cut
+sub Exception {
+    my $self = shift;
+    my $msg  = shift;
+
+    return unless $self->dbi_args->{args}->{PrintError};
     
+    my $out  = "Exception: $msg - ";
+
+    $out .= $self->last_error if $self->last_error;
+    
+    carp $out;
+}
+
 =head1 AUTHOR
 
 

@@ -1,11 +1,15 @@
 #!perl -T
 use warnings FATAL => 'all';
 
-use Test::More tests => 17;
+use Test::More tests => 18;
 
 use DBIx::Fast;
 
-my $db = DBIx::Fast->new( db => 't/db/test.db', host => 'sqlite');
+my $db = DBIx::Fast->new(
+    db     => 't/db/test.db',
+    driver => 'SQLite',
+    Error  => 0,
+    PrintError => 0 );
 
 $db->delete('test', { id => { '>' => 0 } });
 
@@ -16,7 +20,9 @@ is ref $db->errors,'ARRAY','Errors OK';
 can_ok($db,qw(insert update delete q val all hash array count));
 
 is $db->val('select count(*) from test'), 0, 'empty';
+
 is $db->count('test'), 0, 'empty';
+
 is $db->count('test',
 		     {
 			 id  => { '>' => 999 },
@@ -63,7 +69,6 @@ is $db->sql,'DELETE FROM test WHERE id > ? ','Delete ID Multi Args >';
 $db->delete('test', { id => 999 } );
 is $db->sql,'DELETE FROM test WHERE id = ? ','Delete ID';
 
-#$db->hash('SELECT id FROM test WHERE id > 1');
-#like $db->results->{time}, qr//, 'time NOW()';
+like $db->TableName('TableName'), qr/TableName/, 'TableName OK';
 
 done_testing();

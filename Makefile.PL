@@ -20,7 +20,6 @@ WriteMakefile(
     PREREQ_PM => {
 	'DBIx::Connector' => 0.53,
 	'Moo' => 1,
-	'DateTime::Format::MySQL' => 0.04,
     },
     dist  => { COMPRESS => 'gzip -9f', SUFFIX => 'gz', },
     clean => { FILES => 'DBIx-Fast-*' },
