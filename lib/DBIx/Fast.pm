@@ -547,8 +547,10 @@ __END__
     $db->update('table', { sen => { name => 'update t3st' }, where => { id => 1 } });
     $db->update('table', { sen => { name => 'update t3st' }, where => { id => 1 } }, time => 'mod_time');
 
-    $db->up('table, { name => 'Update Name' } , { id => 1 } );
+    $db->up('table', { name => 'Update Name' } , { id => 1 } );
     $db->up('table, { name => 'Update Name' } , { id => 1 } , time => 'mod_time');
+
+    $db->delete('test', { id => 1 });
 
     $db->last_sql;
     $db->last_id;
@@ -606,7 +608,9 @@ __END__
 =back
 
 =head2 C<now>
+
    Timestamp Mysql format
+
 =cut
 
 =head2 C<set_error>
@@ -714,7 +718,7 @@ __END__
 
 =head2 C<update>
 
-        $d->update('test', {
+        $db->update('test', {
                            sen   => { uid => 1 , name => 'mrtest' ,status => 1 },
                            where => { id => 33 },
         }, time => 'update_time');
@@ -725,7 +729,7 @@ __END__
 
     Insert statment
 
-    $d->insert('test',
+    $db->insert('test',
            {
                name => 'tester',
                status => 0
@@ -737,8 +741,8 @@ __END__
 
    Delete statment : delete( table , hash );
 
-   $d->delete('test', { id => $d->last_id });
-   $d->delete('test', { id => 1 });
+   $db->delete('test', { id => $db->last_id });
+   $db->delete('test', { id => 1 });
 
 =cut
 
@@ -794,7 +798,7 @@ You can find documentation for this module with the perldoc command.
 
 You can also look for information at:
 
-=over 4
+=over 3
 
 =item * RT: CPAN's request tracker (report bugs here)
 
