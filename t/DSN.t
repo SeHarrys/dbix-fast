@@ -1,13 +1,9 @@
 #!perl -T
-use lib '/Users/real/Mios/code/DBIx-Fast/lib/';
-
 use strict;
 use warnings;
 
 use Test::More;
 use DBIx::Fast;
-use Data::Dumper;
-use feature 'say';
 
 eval "use DBD::SQLite 1.74";
 plan skip_all => "DBD::SQLite 1.74" if $@;
@@ -28,7 +24,6 @@ my $DSN = {
 };
 
 for my $Key (keys %{$DSN}) {
-    say $DSN->{$Key}." " x ( 55 - length($DSN->{$Key}) ).$Key if $ENV{DBIX_FAST_TEST};
     is $db->_dsn_to_dbi($Key),$DSN->{$Key},'_dsn_to_dbi : '.$Key;
 }
 

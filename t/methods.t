@@ -1,17 +1,12 @@
 #!perl -T
-use lib '/Users/real/Mios/code/DBIx-Fast/lib/';
-
 use strict;
 use warnings FATAL => 'all';
 
 use Test::More;
 use DBIx::Fast;
-use Data::Dumper;
-use feature 'say';
+
 eval "use DBD::SQLite 1.74";
 plan skip_all => "DBD::SQLite 1.74" if $@;
-
-#plan tests => 18;
 
 my $db = DBIx::Fast->new(
     db     => 't/db/test.db',
