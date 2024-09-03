@@ -4,9 +4,9 @@ NAME
 SYNOPSIS
         use DBIx::Fast;
 
-        $db = DBIx::Fast->new( dsn => 'dbi:MariaDB:database=test:host', user => 'test', passwd => 'test' );
+        $db = DBIx::Fast->new( dsn => 'dbi:MariaDB:database=test:host', user => 'test', password => 'test' );
 
-        $db = DBIx::Fast->new( db => 'test', user => 'test', passwd => 'test', driver => 'MariaDB', trace => '1', profile => '!Statement:!MethodName' );
+        $db = DBIx::Fast->new( db => 'test', user => 'u', password => 'p', driver => 'MariaDB', trace => '1', profile => '!Statement:!MethodName' );
 
         $db->all('SELECT * FROM test WHERE 1');
 
@@ -25,8 +25,10 @@ SYNOPSIS
         $db->update('table', { sen => { name => 'update t3st' }, where => { id => 1 } });
         $db->update('table', { sen => { name => 'update t3st' }, where => { id => 1 } }, time => 'mod_time');
 
-        $db->up('table, { name => 'Update Name' } , { id => 1 } );
-        $db->up('table, { name => 'Update Name' } , { id => 1 } , time => 'mod_time');
+        $db->up('table', { name => 'Update Name' } , { id => 1 } );
+        $db->up('table', { name => 'Update Name' } , { id => 1 } , time => 'mod_time');
+
+        $db->delete('test', { id => 1 });
 
         $db->last_sql;
         $db->last_id;
@@ -54,6 +56,12 @@ SUBROUTINES/METHODS
     errors
          All errors
 
+    p
+         Params to bind
+
+    sql
+         SQL Sentence
+
     last_sql
          Last SQL Executed
 
@@ -67,14 +75,15 @@ SUBROUTINES/METHODS
          Last result
 
   "now"
-   Timestamp Mysql format
+       Timestamp Mysql format
+
   "set_error"
         Add error to the array
 
   "BUILD"
         Build Moo
 
-  "_Driver_dbd"
+  "_check_dbd"
         Set DataBase Driver
 
   "_dsn_dbi"
@@ -121,7 +130,7 @@ SUBROUTINES/METHODS
         $db->up('table', { name => "New Name" } , { id => 1 } , time => 'time_update' );
 
   "update"
-            $d->update('test', {
+            $db->update('test', {
                                sen   => { uid => 1 , name => 'mrtest' ,status => 1 },
                                where => { id => 33 },
             }, time => 'update_time');
@@ -129,7 +138,7 @@ SUBROUTINES/METHODS
   "insert"
         Insert statment
 
-        $d->insert('test',
+        $db->insert('test',
                {
                    name => 'tester',
                    status => 0
@@ -138,11 +147,11 @@ SUBROUTINES/METHODS
   "delete"
        Delete statment : delete( table , hash );
 
-       $d->delete('test', { id => $d->last_id });
-       $d->delete('test', { id => 1 });
+       $db->delete('test', { id => $db->last_id });
+       $db->delete('test', { id => 1 });
 
   "extra_args"
-        Time : now time in mysql format
+        Time : NOW() time in mysql format
 
   "make_sen"
         FIXME : Hacer con execute_prepare
@@ -174,17 +183,17 @@ SUPPORT
 
     You can also look for information at:
 
-    *   RT: CPAN's request tracker (report bugs here)
+    *  RT: CPAN's request tracker (report bugs here)
 
-        <http://rt.cpan.org/NoAuth/Bugs.html?Dist=DBIx-Fast>
+       <http://rt.cpan.org/NoAuth/Bugs.html?Dist=DBIx-Fast>
 
-    *   MetaCPAN
+    *  MetaCPAN
 
-        <https://metacpan.org/pod/DBIx::Fast>
+       <https://metacpan.org/pod/DBIx::Fast>
 
-    *   Search CPAN
+    *  Search CPAN
 
-        <http://search.cpan.org/dist/DBIx-Fast/>
+       <http://search.cpan.org/dist/DBIx-Fast/>
 
 LICENSE AND COPYRIGHT
     This program is free software; you can redistribute it and/or modify it
