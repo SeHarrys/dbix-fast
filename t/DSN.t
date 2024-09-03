@@ -11,8 +11,8 @@ plan skip_all => "DBD::SQLite 1.74" if $@;
 my $db = DBIx::Fast->new(
     db     => 't/db/test.db',
     driver => 'SQLite',
-    RaiseError => 0,
-    PrintError => 0);
+    PrintError => 1
+    );
 
 my $DSN = {
     'postgresql://user@127.0.0.1:5432/dbname?reconnect=60' => "dbi:Pg:dbname=dbname;host=127.0.0.1;port=5432",

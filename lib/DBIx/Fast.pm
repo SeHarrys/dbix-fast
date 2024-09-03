@@ -3,7 +3,7 @@ package DBIx::Fast;
 use strict;
 use warnings;
 
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 
 use Carp;
 use Moo;
@@ -30,6 +30,7 @@ sub now {
   my $self = shift;
   my ($sec, $min, $hour, $mday, $mon , $year) = localtime;
 
+  ## MySQL / MariaDB
   return sprintf("%04d-%02d-%02d %02d:%02d:%02d",$year + 1900, $mon + 1, $mday, $hour, $min, $sec);
 }
 
@@ -52,7 +53,7 @@ sub set_error {
 
 sub BUILD {
   my ($self,$args) = @_;
-
+  
   my $DConf = {
 	       DBI => {
 		       RaiseError => $args->{RaiseError} // 0,
@@ -70,13 +71,18 @@ sub BUILD {
   $DConf->{quote} = $args->{quote}       if $args->{quote};
 
   $self->_set_args($DConf);
+  
+  ## No DSN or Host
+  unless ( defined($args->{dsn}) || defined($args->{db}) ) {
+      $self->Exception("Need a DSN or Host");
+  }
 
   $self->_set_dsn($args->{dsn} ? $self->_check_dsn($args->{dsn}) : $self->_make_dsn($args));
 
   $self->Q( SQL::Abstract->new );
 
   $self->db( DBIx::Connector->new( $self->dsn, 
-				   $args->{user}, $args->{passwd},
+				   $args->{user}, $args->{password},
 				   $self->args->{DBI} ) );
 
   $self->db->mode('ping');
@@ -146,6 +152,7 @@ sub _make_dsn {
   return 'dbi:SQLite:dbname='.$args->{db} if $args->{driver} eq 'SQLite';
 
   $self->Exception("DSN Host: Not defined") unless $args->{host};
+  $self->Exception("DSN DB: Not defined")   unless $args->{db};
 
   return 'dbi:'.$self->dbd.':database='.$args->{db}.':'.$args->{host};
 }
@@ -163,10 +170,14 @@ sub _dsn_to_dbi {
 
   ($URI->{schema},$URI->{UI},$URI->{connect},$URI->{db}) = ( $dsn =~ /^(.*):\/\/(.*)\@(.*)\/(.*)$/g );
 
-  $self->Exception("_dsn_to_dbi : schema") unless $URI->{schema};
+  $self->Exception("_dsn_to_dbi : schema")  unless $URI->{schema};
+
+  $self->Exception("_dsn_to_dbi : connect") unless $URI->{connect};
 
   $URI->{connect} =~ /:/ ? ($URI->{host},$URI->{port}) = split ':',$URI->{connect} : $URI->{host} = $URI->{connect};
   $URI->{UI}      =~ /:/ ? ($URI->{user},$URI->{password}) = split ':',$URI->{UI}  : $URI->{user} = $URI->{UI};
+
+  $self->Exception('_dsn_to_dbi : No DB value') unless $URI->{db};
 
   ## Loop Attrs + Value
   if ( $URI->{db} =~ s/^(.*)\?(.*)$/$1/ ) {
@@ -503,7 +514,7 @@ sub Exception {
   my $self = shift;
   my $msg  = shift;
 
-  return unless $self->args->{DBI}->{PrintError};
+  die unless $self->args->{DBI}->{PrintError};
 
   my $out  = "Exception: $msg";
 
@@ -526,9 +537,9 @@ __END__
 
     use DBIx::Fast;
 
-    $db = DBIx::Fast->new( dsn => 'dbi:MariaDB:database=test:host', user => 'test', passwd => 'test' );
+    $db = DBIx::Fast->new( dsn => 'dbi:MariaDB:database=test:host', user => 'test', password => 'test' );
 
-    $db = DBIx::Fast->new( db => 'test', user => 'test', passwd => 'test', driver => 'MariaDB', trace => '1', profile => '!Statement:!MethodName' );
+    $db = DBIx::Fast->new( db => 'test', user => 'u', password => 'p', driver => 'MariaDB', trace => '1', profile => '!Statement:!MethodName' );
 
     $db->all('SELECT * FROM test WHERE 1');
 
@@ -548,7 +559,7 @@ __END__
     $db->update('table', { sen => { name => 'update t3st' }, where => { id => 1 } }, time => 'mod_time');
 
     $db->up('table', { name => 'Update Name' } , { id => 1 } );
-    $db->up('table, { name => 'Update Name' } , { id => 1 } , time => 'mod_time');
+    $db->up('table', { name => 'Update Name' } , { id => 1 } , time => 'mod_time');
 
     $db->delete('test', { id => 1 });
 
@@ -589,6 +600,14 @@ __END__
 
  All errors
 
+=item p
+
+ Params to bind
+
+=item sql
+
+ SQL Sentence
+
 =item last_sql
 
  Last SQL Executed
@@ -625,7 +644,7 @@ __END__
 
 =cut
 
-=head2 C<_Driver_dbd>
+=head2 C<_check_dbd>
 
     Set DataBase Driver
 
@@ -748,7 +767,7 @@ __END__
 
 =head2 C<extra_args>
 
-    Time : now time in mysql format
+    Time : NOW() time in mysql format
 
 =cut
 

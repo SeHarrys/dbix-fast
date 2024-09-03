@@ -11,8 +11,7 @@ plan skip_all => "DBD::SQLite 1.74" if $@;
 my $db = DBIx::Fast->new(
     db     => 't/db/test.db',
     driver => 'SQLite',
-    RaiseError => 0,
-    PrintError => 0 );
+    PrintError => 1 );
 
 can_ok($db,qw(insert update delete q val all hash array count));
 
@@ -20,7 +19,8 @@ $db->delete('test', { id => { '>' => 0 } });
 
 for (qw(be eb)) { $db->execute("SELECT * FROM $_"); }
 
-is ref $db->errors,'ARRAY','Errors OK';
+is ref $db->errors,'ARRAY'  ,'Errors Set';
+is scalar(@{$db->errors}),2 ,'Errors Size 2';
 
 is $db->val('select count(*) from test'), 0, 'empty';
 
