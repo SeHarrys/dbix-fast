@@ -1,5 +1,9 @@
 Revision history for DBIx-Fast
 
+0.13	01/09/24
+	- t/exception.t
+	- Clean
+	
 0.12	01/09/24
 	- Test
 	- DSN / URI
