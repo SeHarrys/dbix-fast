@@ -11,4 +11,4 @@ on:
 
 jobs:
   build:
-    uses: PerlToolsTeam/github_workflows/.github/workflows/cpan-test.yml@main
+    uses: SeHarrys/dbix-fast/.github/workflows/cpan-test.yml@main
