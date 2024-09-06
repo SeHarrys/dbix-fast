@@ -16,7 +16,8 @@ on:
 
 jobs:
   testing:
-    runs-on: ${{ matrix.os }}
+    runs-on: self-hosted
+    #${{ matrix.os }}
     strategy:
       matrix:
         os: ${{ fromJson(inputs.os) }}
