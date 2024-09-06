@@ -1,4 +1,5 @@
 name: macos
+run-name: ${{ github.actor }} is run prove
 on:
   push:
     branches:
@@ -8,7 +9,7 @@ on:
   pull_request:
 jobs:
   perl:
-    runs-on: macOS-latest
+    runs-on: ["self-hosted","macOS-latest"]
     steps:
       - uses: actions/checkout@v2
       - name: Set up Perl
