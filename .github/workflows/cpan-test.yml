@@ -12,7 +12,7 @@ on:
       os:
         required: false
         type: string
-        default: "['windows-latest', 'macos-latest', 'ubuntu-latest']"
+        default: "['windows-latest', 'macos-latest', 'ubuntu-latest','self-hosted']"
 
 jobs:
   testing:

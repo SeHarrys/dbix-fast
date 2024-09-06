@@ -8,5 +8,6 @@ on:
   workflow_dispatch:
 
 jobs:
+  runs-on: self-hosted
   build:
     uses: PerlToolsTeam/github_workflows/.github/workflows/cpan-test.yml@main
