@@ -4,11 +4,11 @@ runs-on: self-hosted
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
   pull_request:
-    branches: [ main ]
+    branches: [ master ]
   workflow_dispatch:
 
 jobs:
   build:
-    uses: SeHarrys/dbix-fast/.github/workflows/cpan-test.yml@main
+    uses: SeHarrys/dbix-fast/.github/workflows/cpan-test.yml@master
