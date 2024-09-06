@@ -1,5 +1,5 @@
 name: macos
-run-name: ${{ github.actor }} is run prove
+run-name: ${{ github.actor }} is run prove on macOS
 on:
   push:
     branches:
@@ -19,6 +19,8 @@ jobs:
       - name: Install Dependencies
         run: |
           curl -L https://cpanmin.us | perl - --installdeps .
-          curl -L https://cpanmin.us | perl - -n TAP::Formatter::GitHubActions
+          curl -L https://cpanmin.us | perl - -n Test::Pod Test::Pod::Coverage Pod::Coverage TAP::Formatter::GitHubActions
       - name: Run Tests
-        run: prove --merge --formatter TAP::Formatter::GitHubActions -l t t/
+        run: prove --merge --formatter TAP::Formatter::GitHubActions -l t/
+	env:
+	  DBIX_FAST_TEST: 1
