@@ -1,7 +1,5 @@
 name: CI
 
-runs-on: self-hosted
-
 on:
   push:
     branches: [ master ]
