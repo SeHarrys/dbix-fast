@@ -9,7 +9,7 @@ on:
   pull_request:
 jobs:
   perl:
-    runs-on: ["self-hosted","macOS-latest"]
+    runs-on: macOS-latest
     steps:
       - uses: actions/checkout@v2
       - name: Set up Perl
