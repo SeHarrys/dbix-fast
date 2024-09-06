@@ -17,7 +17,6 @@ on:
 jobs:
   testing:
     runs-on: self-hosted
-    #${{ matrix.os }}
     strategy:
       matrix:
 	os: ["macos-latest"]
