@@ -20,4 +20,4 @@ jobs:
           curl -L https://cpanmin.us | perl - --installdeps .
           curl -L https://cpanmin.us | perl - -n TAP::Formatter::GitHubActions
       - name: Run Tests
-        run: prove --merge --formatter TAP::Formatter::GitHubActions -l t t/mojo t/mojolic
+        run: prove --merge --formatter TAP::Formatter::GitHubActions -l t t/
