@@ -20,8 +20,10 @@ jobs:
     #${{ matrix.os }}
     strategy:
       matrix:
-        os: ${{ fromJson(inputs.os) }}
-        perl: ${{ fromJson(inputs.perl_version) }}
+	os: ["macos-latest"]
+	perl: ["5.38"]
+        #os: ${{ fromJson(inputs.os) }}
+        #perl: ${{ fromJson(inputs.perl_version) }}
     name: Perl ${{ matrix.perl }} on ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
