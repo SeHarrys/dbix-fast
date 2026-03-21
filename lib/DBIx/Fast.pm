@@ -1,574 +1,636 @@
 package DBIx::Fast;
 
-use strict;
-use warnings;
+use v5.38;
+use Object::Pad;
 
-our $VERSION = '0.1401';
-
-use Carp;
-use Moo;
+our $VERSION = '0.16';
 
 use DBI;
 use DBIx::Connector;
 use SQL::Abstract;
-
-has args    => ( is => 'rwp' );
-has db      => ( is => 'rw'  );
-has dbd     => ( is => 'rwp' );
-has dsn     => ( is => 'rwp' ); # DSN String
-has errors  => ( is => 'rwp' ); # Array errors
-has results => ( is => 'rw'  ); # Last return
-has sql     => ( is => 'rw'  ); # SQL Actual
-has p       => ( is => 'rw'  );
-has Q       => ( is => 'rw'  ); # SQL::Abstract
-has Tables  => ( is => 'rwp' );
-
-has last_id    => ( is => 'rw'  );
-has last_error => ( is => 'rwp' );
-has last_sql   => ( is => 'rw'  );
-
-sub now {
-  my $self = shift;
-  my ($sec, $min, $hour, $mday, $mon , $year) = localtime;
-
-  ## MySQL / MariaDB
-  return sprintf("%04d-%02d-%02d %02d:%02d:%02d",$year + 1900, $mon + 1, $mday, $hour, $min, $sec);
-}
-
-sub set_error {
-  my $self  = shift;
-
-  my $error = {
-	       id    => shift,
-	       error => shift,
-	       time  => time()
-	      };
-
-  my $Errors = $self->errors;
-  push @{$Errors} ,$error;
-
-  $self->_set_last_error(qq{$error->{time} - [$error->{id}] - $error->{error}});
-  $self->_set_errors($Errors);
-}
-
-
-sub BUILD {
-  my ($self,$args) = @_;
-
-  # Force all
-  if ( $args->{Error} ) {
-      $args->{RaiseError} = 1;
-      $args->{PrintError} = 1;
-  }
-
-  # SQLite
-  if ( $args->{SQLite} ) {
-      $self->Exception("No DB Found : ".$args->{SQLite}) unless -e $args->{SQLite};
-      $args->{db} = $args->{SQLite};
-      $args->{driver} = 'SQLite'
-  }
-
-  my $DConf = {
-      DBI => {
-	  RaiseError => $args->{RaiseError} // 0,
-	  PrintError => $args->{PrintError} // 0,
-	  AutoCommit => $args->{AutoCommit} // 1
-      },
-      Auth => {
-	  user     => $args->{user}     // '',
-	  password => $args->{password} // '',
-	  host     => $args->{host}     // ''
-      },
-      tn     => $args->{tn} // 1,
-      db     => $args->{db}  // '',
-      dsn    => $args->{dsn} // '',
-      driver => $args->{driver} // '',
-      quote  => $args->{quote}  // '',
-      trace  => $args->{trace}  // '',
-      profile => $args->{profile} // '',
-      abstract => $args->{abstract} // 1
-  };
-
-  $DConf->{DBI}->{mysql_enable_utf8} = 1 if $args->{mysql_enable_utf8};
-
-  $self->_set_args($DConf);
-
-  $self->Q( SQL::Abstract->new ) if $self->args->{abstract};
-  
-  # No DSN or Host
-  unless ( $self->args->{dsn} || $self->args->{db} ) {
-      $self->Exception("Need a DSN or Host");
-  }
-
-  $self->_set_dsn($self->args->{dsn} ? $self->_check_dsn($self->args->{dsn}) : $self->_make_dsn($self->args));
-
-  $self->db( DBIx::Connector->new( $self->dsn, 
-				   $self->args->{user}, $self->args->{password},
-				   $self->args->{DBI} ) );
-
-  $self->db->mode('ping');
-
-  $self->db->dbh->quote($self->args->{quote}) if $self->args->{quote};
-
-  $self->db->dbh->{HandleError} = sub {
-    $self->set_error($DBI::err,$DBI::errstr);
-  };
-
-  $self->db->dbh->trace($self->args->{trace},'dbix-fast-trace') if $self->args->{trace};
-
-  $self->_profile($self->args->{profile}) if $self->args->{profile};
-
-  ## Set TablesName
-  #$self->_TablesName() if $self->args->{tn};
-}
-
-sub _TablesName {
-    my $self = shift;
-
-    return $self->all('tables'); #SHOW TABLES()');
-}
-
-sub _Driver_dbd {
-  my $self = shift;
-  my $dbd  = shift;
-
-  $self->Exception("Error DBD Driver") unless $dbd;
-
-  map { $self->_set_dbd($_) if lc($dbd) eq lc($_) } qw(SQLite Pg MariaDB mysql);
-
-  $self->Exception("Error DBD Driver : $dbd") unless $self->dbd;
-}
-
-sub _dsn_dbi {
-  my $self = shift;
-  my $dsn  = shift;
-
-  my ($dbi,$driver,$db,$host) = split ':', $dsn;
-
-  $self->Exception("DSN DBI: $dbi") unless $dbi eq 'dbi';
-
-#    if ( $driver eq 'SQLite' ) {
-#        $db =~ s/^(dbname|database)\=(.*)$/$2/;
-#    } elsif ( $driver eq 'Pg' ) {
-#    } else {
-#        $self->Exception("DSN Host") unless $host;
-#    }
-
-  $self->Exception("DSN DataBase: $db") unless $db;
-
-  $self->_Driver_dbd($driver);
-
-  return $dsn;
-}
-
-
-sub _check_dsn {
-  my $self = shift;
-  my $dsn  = shift;
-
-  ## DSN DBI = ^dbi
-  return $self->_dsn_dbi($dsn) if $dsn =~ /^dbi/;
-
-  ## DSN to DBI
-  return $self->_dsn_to_dbi($dsn);
-}
-
-sub _make_dsn {
-  my $self = shift;
-  my $args = shift;
-
-  $self->Exception("DSN Driver: Not defined") unless $args->{driver};
-
-  $self->_Driver_dbd($args->{driver});
-
-  return 'dbi:SQLite:dbname='.$args->{db} if $args->{driver} eq 'SQLite';
-
-  $self->Exception("DSN Host: Not defined") unless $args->{host};
-  $self->Exception("DSN DB: Not defined")   unless $args->{db};
-
-  return 'dbi:'.$self->dbd.':database='.$args->{db}.':'.$args->{host};
-}
-
-sub _dsn_to_dbi {
-  my $self = shift;
-  my $dsn  = shift;
-  my $URI;
-
-  #SQLite
-  if ( $dsn =~ /^sqlite:\/\/\/(.*)$/ ) {
-    $self->_set_dbd('SQLite');
-    return 'dbi:SQLite:dbname='.$1; # , schema => 'sqlite' , db => $1 };
-  }
-
-  ($URI->{schema},$URI->{UI},$URI->{connect},$URI->{db}) = ( $dsn =~ /^(.*):\/\/(.*)\@(.*)\/(.*)$/g );
-
-  $self->Exception("_dsn_to_dbi : schema")  unless $URI->{schema};
-
-  $self->_Driver_dbd($URI->{schema});
-  
-  $self->Exception("_dsn_to_dbi : connect") unless $URI->{connect};
-
-  $URI->{connect} =~ /:/ ? ($URI->{host},$URI->{port}) = split ':',$URI->{connect} : $URI->{host} = $URI->{connect};
-
-  # UserInfo
-  if ( $URI->{UI} =~ /:/ ) {
-      ($URI->{user},$URI->{password}) = split ':',$URI->{UI};
-      my $SetArgs = $self->args;
-      $SetArgs->{Auth}->{user} = $URI->{user};
-      $SetArgs->{Auth}->{password} = $URI->{password};
-      $self->_set_args($SetArgs);
-  } else {
-      $URI->{user} = $URI->{UI}
-  }
-
-  $self->Exception('_dsn_to_dbi : No DB value') unless $URI->{db};
-  
-  ## Loop Attrs + Value
-  if ( $URI->{db} =~ s/^(.*)\?(.*)$/$1/ ) {
-    ($URI->{attribute},$URI->{value}) = split '=',$2;
-  }
-
-  if ( $dsn =~ /^(postgres|postgresql):/ ) {
-    $self->_set_dbd('Pg');
-    $URI->{DSN} = 'dbi:Pg:dbname='.$URI->{db}.';host='.$URI->{host}.';port='.$URI->{port};
-  } elsif ( $dsn =~ /^(mariadb):/ ) {
-    $self->_set_dbd('MariaDB');
-    $URI->{DSN} = 'dbi:MariaDB:dbname='.$URI->{db}.';host='.$URI->{host}.';port='.$URI->{port};
-  } elsif ( $dsn =~ /^(mysql|mysqlx):/ ) {
-    $self->_set_dbd('mysql');
-    $URI->{DSN} = 'dbi:mysql:dbname='.$URI->{db}.';host='.$URI->{host}.';port='.$URI->{port};
-  } else {
-    $self->Exception("_dsn_to_dbi : $dsn");
-  }
-
-  return $URI->{DSN};
-}
-
-sub _profile {
-  my $self = shift;
-  my $stat = shift."/DBI::ProfileDumper/";
-
-  $stat .= qq{File:dbix-fast-$$.log};
-
-  $self->db->dbh->{Profile} = $stat;
-}
-
-sub all {
-  my $self = shift;
-
-  $self->q(@_);
-
-  my $res = $self->db->dbh->selectall_arrayref($self->sql,
-					       { Slice => {} },@{$self->p});
-
-  $self->Exception("ERROR all()") if $DBI::err;
-
-  $self->results($res);
-}
-
-sub flat {
-  my $self = shift;
-
-  $self->q(@_);
-
-  my $sth = $self->db->dbh->prepare($self->sql);
-
-  $sth->execute(@{$self->p});
-
-  my @Flat;
-
-  while(my $row = $sth->fetchrow_array) {
-    push @Flat,$row;
-  }
-
-  $self->results(\@Flat);
-
-  return @Flat;
-}
-
-sub hash {
-  my $self = shift;
-
-  $self->q(@_);
-
-  my $sth = $self->db->dbh->prepare($self->sql);
-
-  $sth->execute(@{$self->p});
-
-  my $res = $sth->fetchrow_hashref;
-
-  $self->Exception("hash()") if $DBI::err;
-
-  $self->results($res);
-}
-
-sub val {
-  my $self = shift;
-
-  $self->q(@_);
-
-  return $self->db->dbh->selectrow_array($self->sql, undef, @{$self->p});
-}
-
-sub array {
-  my $self = shift;
-
-  $self->q(@_);
-
-  my $sth = $self->db->dbh->prepare($self->sql);
-
-  $sth->execute(@{$self->p});
-
-  $self->Exception("array()") if $DBI::err;
-
-  my @rows = @{ $self->db->dbh->selectcol_arrayref( $self->sql, undef, @{ $self->p } ) };
-
-  $self->results(\@rows);
-}
-
-sub count {
-  my $self  = shift;
-  my $table = $self->TableName(shift);
-  my $skeel = shift;
-
-  $self->sql("SELECT COUNT(*) FROM $table");
-
-  return $self->db->dbh->selectrow_array($self->sql)
-    unless $skeel;
-
-  $self->_make_where($skeel);
-
-  return $self->db->dbh->selectrow_array($self->sql, undef, @{$self->p});
-}
-
-sub _make_where {
-  my $self  = shift;
-  my $skeel = shift;
-  my @p;
-
-  my $sql = " WHERE ";
-
-  for my $K ( keys %{$skeel} ) {
-    my $key;
-
-    if ( ref $skeel->{$K} eq 'HASH' ) {
-      $key = (keys %{$skeel->{$K}})[0];
-      push @p,$skeel->{$K}->{$key};
-    } else {
-      $key = '=';
-      push @p,$skeel->{$K};
+use Carp qw(croak);
+use Time::HiRes qw(time);
+
+use DBIx::Fast::Schema;
+use DBIx::Fast::Transaction;
+use DBIx::Fast::Profiler;
+
+class DBIx::Fast {
+
+    # Public accessor fields
+    field $db       :accessor = undef;
+    field $sql      :accessor = undef;
+    field $last_sql :accessor = undef;
+    field $p        :accessor = undef;
+    field $Q        :accessor = undef;
+    field $results  :accessor = undef;
+    field $last_id  :accessor = undef;
+
+    # Internal state with readers
+    field $_args       :reader(args)       = undef;
+    field $_dbd        :reader(dbd)        = undef;
+    field $_dsn        :reader(dsn)        = undef;
+    field $_errors     :reader(errors)     = [];
+    field $_last_error :reader(last_error) = undef;
+
+    # Lazy subsystems
+    field $_schema;
+    field $_transaction;
+    field $_profiler;       # Driver-specific profile (MariaDB/SQLite)
+    field $_query_tracker;  # Generic query profiler (DBIx::Fast::Profiler)
+    field %_extensions;
+
+
+    # Constructor params
+    field $_init_db         :param(db)                 = undef;
+    field $_init_dsn        :param(dsn)                = '';
+    field $_init_SQLite     :param(SQLite)             = undef;
+    field $_init_driver     :param(driver)             = '';
+    field $_init_user       :param(user)               = '';
+    field $_init_password   :param(password)           = '';
+    field $_init_host       :param(host)               = '';
+    field $_init_tn         :param(tn)                 = 0;
+    field $_init_quote      :param(quote)              = '';
+    field $_init_trace      :param(trace)              = '';
+    field $_init_profile    :param(profile)            = '';
+    field $_init_abstract   :param(abstract)           = 1;
+    field $_init_RaiseError :param(RaiseError)         = undef;
+    field $_init_PrintError :param(PrintError)         = undef;
+    field $_init_AutoCommit :param(AutoCommit)         = undef;
+    field $_init_mysql_utf8 :param(mysql_enable_utf8)  = 0;
+    field $_init_Error      :param(Error)              = undef;  # Accepted for compat, use RaiseError/PrintError
+
+    ADJUST {
+        # SQLite shortcut
+        if ($_init_SQLite) {
+            $_init_db     //= $_init_SQLite;
+            $_init_driver   = 'SQLite';
+        }
+
+        # Build processed config
+        $_args = {
+            DBI => {
+                RaiseError => $_init_RaiseError // 1,
+                PrintError => $_init_PrintError // 0,
+                AutoCommit => $_init_AutoCommit // 1,
+            },
+            Auth => {
+                user     => $_init_user,
+                password => $_init_password,
+                host     => $_init_host,
+            },
+            tn       => $_init_tn,
+            db       => $_init_db // '',
+            dsn      => $_init_dsn,
+            driver   => $_init_driver,
+            quote    => $_init_quote,
+            trace    => $_init_trace,
+            profile  => $_init_profile,
+            abstract => $_init_abstract,
+        };
+
+        $_args->{DBI}->{mysql_enable_utf8} = 1 if $_init_mysql_utf8;
+
+        # SQLite file check
+        if ($_init_SQLite) {
+            $self->Exception("No DB Found : $_init_SQLite")
+              unless -e $_init_SQLite;
+        }
+
+        $Q = SQL::Abstract->new if $_args->{abstract};
+
+        unless ($_args->{dsn} || $_args->{db}) {
+            $self->Exception("Need a DSN or Host");
+        }
+
+        $_dsn = $_args->{dsn}
+          ? $self->_check_dsn($_args->{dsn})
+          : $self->_make_dsn($_args);
+
+        # Handle db param: connector object or string
+        if ($_init_db && ref($_init_db)) {
+            $db = $_init_db;
+        }
+        else {
+            $db = DBIx::Connector->new(
+                $_dsn,
+                $_args->{Auth}->{user},
+                $_args->{Auth}->{password},
+                $_args->{DBI}
+            );
+        }
+
+        $db->mode('ping');
+
+        $db->dbh->quote($_args->{quote}) if $_args->{quote};
+
+        $db->dbh->{HandleError} = sub {
+            $self->set_error($DBI::err, $DBI::errstr);
+            return 0;  # Let DBI continue with RaiseError/PrintError
+        };
+
+        $db->dbh->trace($_args->{trace}, 'dbix-fast-trace')
+          if $_args->{trace};
+
+        $self->_profile($_args->{profile}) if $_args->{profile};
+
+        $self->schema->_load_tables_name if $_args->{tn};
     }
 
-    $sql .= qq{$K $key ? };
-  }
+    # Setters for internal state (needed by tests and internal methods)
+    method _set_args ($val) { $_args = $val }
+    method _set_dbd  ($val) { $_dbd  = $val }
+    method _set_dsn  ($val) { $_dsn  = $val }
 
-  $sql =~ s/,$//;
-
-  $self->sql($self->sql.$sql);
-  $self->p(\@p);
-}
-
-sub execute {
-  my $self = shift;
-  my $sql  = shift;
-  my $extra = shift;
-  my $type  = shift // 'arrayref';
-  my $res;
-
-  $self->sql($sql);
-
-  ## Extra Arguments
-  $self->make_sen($extra) if $extra;
-
-  if ( $type eq 'hash' ) {
-    my $sth = $self->db->dbh->prepare($self->sql);
-    if ( $self->p ) {
-      $sth->execute(@{$self->p});
-    } else {
-      $sth->execute;
+    # Lazy subsystem accessors
+    method schema      { $_schema      //= DBIx::Fast::Schema->new(dbix => $self) }
+    method transaction { $_transaction //= DBIx::Fast::Transaction->new(dbix => $self) }
+    method tracker {
+        $_query_tracker //= DBIx::Fast::Profiler->new(dbix => $self, auto_print => 0);
     }
-    $res = $sth->fetchrow_hashref;
-  } else {
-    if ($self->p ) {
-      $res = $self->db->dbh->selectall_arrayref($self->sql,
-						{ Slice => {} },@{$self->p});
-    } else {
-      $res = $self->db->dbh->selectall_arrayref($self->sql,
-						{ Slice => {} } );
+
+    method profiler {
+        return $_profiler if $_profiler;
+
+        my $driver        = $_dbd;
+        my $profile_class = "DBIx::Fast::Profile::$driver";
+
+        (my $_pf = "$profile_class.pm") =~ s|::|/|g; eval { require $_pf };
+
+        if ($@) {
+            warn "No profile support for $driver, using base profile";
+            require DBIx::Fast::Profile::Base;
+            $_profiler = DBIx::Fast::Profile::Base->new(dbix => $self);
+            return $_profiler;
+        }
+
+        $_profiler = $profile_class->new(dbix => $self);
+        $_profiler->init();
+
+        return $_profiler;
     }
-  }
 
-  $self->Exception("execute()") if $DBI::err;
+    # Transaction helper
+    method txn ($code, $options = undef) {
+        return $self->transaction->do($code, $options);
+    }
 
-  $self->results($res);
-}
+    method load_extension ($extension) {
+        my $module = "DBIx::Fast::$extension";
 
-sub up {
-  my ($self,$table,$data,$where,$time) = @_;
+        (my $_mf = "$module.pm") =~ s|::|/|g; eval { require $_mf };
+        $self->Exception("Error: load_extension => $@") if $@;
 
-  if ( $time ) {
-    $self->update( $self->TableName($table) , { sen => $data , where => $where } , time => $time );
-  } else {
-    $self->update( $self->TableName($table) , { sen => $data , where => $where } );
-  }
-}
+        my $attr = lc($extension);
 
-sub update {
-  my $self  = shift;
-  my $table = $self->TableName(shift);
-  my $skeel = shift;
+        # Check if there's already a method for this
+        if ($self->can($attr)) {
+            return $self->$attr;
+        }
 
-  $skeel->{sen} = $self->extra_args($skeel->{sen},@_) if scalar @_ > 0;
+        return $_extensions{$attr} if exists $_extensions{$attr};
 
-  my @p;
-  my $sql = "UPDATE $table SET ";
+        $_extensions{$attr} = $module->new(dbix => $self);
+        return $_extensions{$attr};
+    }
 
-  for ( keys %{$skeel->{sen}} ) {
-    push @p,$skeel->{sen}->{$_};
-    $sql .= $_.' = ? ,';
-  }
+    method now () {
+        my ($sec, $min, $hour, $mday, $mon, $year) = localtime;
 
-  $sql =~ s/,$//;
-  $sql .= 'WHERE ';
+        return sprintf(
+            "%04d-%02d-%02d %02d:%02d:%02d",
+            $year + 1900, $mon + 1, $mday, $hour, $min, $sec
+        );
+    }
 
-  for my $K ( keys %{$skeel->{where}} ) {
-    push @p,$skeel->{where}->{$K};
-    $sql .= $K.' = ? AND ';
-  }
+    method set_error ($id, $error_msg) {
+        my $error = { id => $id, error => $error_msg, time => time() };
 
-  $sql =~ s/AND $//;
+        push @{$_errors}, $error;
 
-  $self->sql($sql);
-  $self->execute_prepare(@p);
-}
+        $_last_error =
+          qq{$error->{time} - [$error->{id}] - $error->{error}};
+    }
 
-sub insert {
-  my $self  = shift;
-  my $table = $self->TableName(shift);
-  my $skeel = shift;
+    # DSN handling
 
-  $skeel = $self->extra_args($skeel,@_) if scalar @_ > 0;
+    method _Driver_dbd ($dbd_name) {
+        $self->Exception("Error DBD Driver") unless $dbd_name;
 
-  my @p;
-  my $sql= "INSERT INTO $table ( ";
+        for my $d (qw(SQLite Pg MariaDB mysql)) {
+            if (lc($dbd_name) eq lc($d)) {
+                $_dbd = $d;
+                last;
+            }
+        }
 
-  for ( keys %{$skeel} ) {
-    push @p,$skeel->{$_};
-    $sql .= $_.',';
-  }
+        $self->Exception("Error DBD Driver : $dbd_name") unless $_dbd;
+    }
 
-  $sql =~ s/,$/ )/;
-  $sql .= ' VALUES ( '.join(',', ('?') x @p).' )';
+    method _dsn_dbi ($dsn_str) {
+        my ($dbi, $driver, $db_part, $host) = split ':', $dsn_str;
 
-  $self->sql($sql);
-  $self->execute_prepare(@p);
+        $self->Exception("DSN DBI: $dbi") unless $dbi eq 'dbi';
+        $self->Exception("DSN DataBase: $db_part") unless $db_part;
 
-  if ( $self->dbd eq 'MariaDB' ) {
-    $self->last_id($self->db->dbh->{mariadb_insertid});
-  } elsif ( $self->dbd eq 'mysql' ) {
-    $self->last_id($self->db->dbh->{mysql_insertid});
-  } elsif ( $self->dbd eq 'SQLite' ) {
-    $self->last_id($self->db->dbh->sqlite_last_insert_rowid());
-  } elsif ( $self->dbd eq 'Pg' ) {
-    $self->last_id($self->db->dbh->last_insert_id(undef,undef,$table,undef));
-  }
-}
+        $self->_Driver_dbd($driver);
 
-sub delete {
-  my $self  = shift;
-  my $table = $self->TableName(shift);
-  my $skeel = shift;
+        return $dsn_str;
+    }
 
-  $self->sql("DELETE FROM $table");
+    method _check_dsn ($dsn_str) {
+        return $self->_dsn_dbi($dsn_str) if $dsn_str =~ /^dbi/;
+        return $self->_dsn_to_dbi($dsn_str);
+    }
 
-  #unless ( $skeel ) {
-  #    return $self->db->dbh->selectrow_array($self->sql);
-  #}
+    method _make_dsn ($args) {
+        $self->Exception("DSN Driver: Not defined") unless $args->{driver};
 
-  $self->_make_where($skeel);
+        $self->_Driver_dbd($args->{driver});
 
-  my $sth = $self->db->dbh->prepare($self->sql);
+        return 'dbi:SQLite:dbname=' . $args->{db}
+          if $args->{driver} eq 'SQLite';
 
-  $sth->execute(@{$self->p});
-}
+        $self->Exception("DSN Host: Not defined") unless $args->{host};
+        $self->Exception("DSN DB: Not defined")   unless $args->{db};
 
-sub extra_args {
-  my $self  = shift;
-  my $skeel = shift;
-  my %args  = @_;
+        return
+            'dbi:'
+          . $_dbd
+          . ':database='
+          . $args->{db} . ':'
+          . $args->{host};
+    }
 
-  $skeel->{$args{time}} = $self->now() if $args{time};
+    method _dsn_to_dbi ($dsn_str) {
+        my $URI;
 
-  return $skeel;
-}
+        # SQLite
+        if ($dsn_str =~ /^sqlite:\/\/\/(.*)$/) {
+            $_dbd = 'SQLite';
+            return 'dbi:SQLite:dbname=' . $1;
+        }
 
-sub make_sen {
-  my $self  = shift;
-  my $skeel = shift;
-  my $sql   = $self->sql();
-  my @p;
+        ($URI->{schema}, $URI->{UI}, $URI->{connect}, $URI->{db}) =
+          $dsn_str =~ m{^([^:]+)://([^@]+)@([^/]+)/(.+)$};
 
-  ## Ha de encontrar resultados por el orden de entrada parsear debidamente
-  for ( keys %{$skeel} ) {
-    my $arg = ':'.$_;
-    push @p,$skeel->{$_};
-    $sql =~ s/$arg/\?/;
-  }
+        $self->Exception("_dsn_to_dbi : schema") unless $URI->{schema};
 
-  $sql =~ s/,$//;
+        $self->_Driver_dbd($URI->{schema});
+        $self->Exception("_dsn_to_dbi : connect") unless $URI->{connect};
 
-  $self->sql($sql);
-  $self->p(\@p);
-}
+        $URI->{connect} =~ /:/
+          ? ($URI->{host}, $URI->{port}) = split ':', $URI->{connect}
+          : $URI->{host} = $URI->{connect};
 
-sub q {
-  my $self = shift;
-  my $sql  = shift;
-  my @p;
+        # UserInfo
+        if ($URI->{UI} =~ /:/) {
+            ($URI->{user}, $URI->{password}) = split ':', $URI->{UI};
 
-  map { push @p,$_ } @_;
+            $_args->{Auth}->{user}     = $URI->{user};
+            $_args->{Auth}->{password} = $URI->{password};
+        }
+        else {
+            $URI->{user} = $URI->{UI};
+        }
 
-  $self->sql($sql);
-  $self->p(\@p);
-}
+        $self->Exception('_dsn_to_dbi : No DB value') unless $URI->{db};
 
-sub execute_prepare {
-  my $self = shift;
-  my @p    = @_;
+        if ($URI->{db} =~ s/^(.*)\?(.*)$/$1/) {
+            ($URI->{attribute}, $URI->{value}) = split '=', $2;
+        }
 
-  my $sth = $self->db->dbh->prepare($self->sql);
+        if    ($dsn_str =~ /^(postgres|postgresql):/) { $_dbd = 'Pg'      }
+        elsif ($dsn_str =~ /^(mariadb):/)             { $_dbd = 'MariaDB' }
+        elsif ($dsn_str =~ /^(mysql|mysqlx):/)        { $_dbd = 'mysql'   }
+        else  { $self->Exception("_dsn_to_dbi : $dsn_str") }
 
-  $sth->execute(@p);
+        $URI->{DSN} = sprintf('dbi:%s:dbname=%s;host=%s%s',
+            $_dbd, $URI->{db}, $URI->{host},
+            $URI->{port} ? ";port=$URI->{port}" : ''
+        );
 
-  $self->last_sql($self->sql);
-}
+        return $URI->{DSN};
+    }
 
-sub TableName {
-  my $self  = shift;
-  my $table = shift;
+    method _profile ($stat) {
+        $stat .= "/DBI::ProfileDumper/";
+        $stat .= qq{File:dbix-fast-$$.log};
 
-  $self->Exception("TableName not defined") unless $table;
+        $db->dbh->{Profile} = $stat;
+    }
 
-  if ( $self->args->{TableName} ) {
+    # Security: validate SQL identifier (table/column names)
+    method _safe_id ($name) {
+        $self->Exception("Invalid identifier")
+          unless defined $name && $name =~ /^[a-zA-Z_][a-zA-Z0-9_.]*$/;
+        return $name;
+    }
 
-  }
-  
-  return $table unless $table =~ /\W/;
+    # Profiling helper - wraps execution with timing when tracker is active
+    method _track ($code) {
+        if ($_query_tracker) {
+            my $t0  = Time::HiRes::time();
+            my $res = $code->();
+            $_query_tracker->add_query($sql, $p // [], $t0, Time::HiRes::time());
+            $last_sql = $sql;
+            return $res;
+        }
+        $last_sql = $sql;
+        return $code->();
+    }
 
-  $self->Exception("TableName not valid: $table");
-}
+    # Query methods
 
-sub Exception {
-  my $self = shift;
-  my $msg  = shift;
+    method q ($stmt, @params) {
+        $sql = $stmt;
+        $p   = \@params;
+    }
 
-  die unless $self->args->{DBI}->{PrintError};
+    method all (@args) {
+        $sql = shift @args;
+        $p   = \@args;
 
-  my $out  = "Exception: $msg";
+        $results = $self->_track(sub {
+            $db->dbh->selectall_arrayref($sql, { Slice => {} }, @{$p});
+        });
+        return $results;
+    }
 
-  $out .= " - Last error: ".$self->last_error if $self->last_error;
+    method flat (@args) {
+        $sql = shift @args;
+        $p   = \@args;
 
-  carp $out;
+        my @Flat;
+        $self->_track(sub {
+            my $sth = $db->dbh->prepare($sql);
+            $sth->execute(@{$p});
+            while (my $row = $sth->fetchrow_array) {
+                push @Flat, $row;
+            }
+            1;
+        });
+
+        $results = \@Flat;
+        return @Flat;
+    }
+
+    method hash (@args) {
+        $sql = shift @args;
+        $p   = \@args;
+
+        $results = $self->_track(sub {
+            my $sth = $db->dbh->prepare($sql);
+            $sth->execute(@{$p});
+            $sth->fetchrow_hashref;
+        });
+        return $results;
+    }
+
+    method val (@args) {
+        $sql = shift @args;
+        $p   = \@args;
+
+        $results = $self->_track(sub {
+            $db->dbh->selectrow_array($sql, undef, @{$p});
+        });
+        return $results;
+    }
+
+    method array (@args) {
+        $sql = shift @args;
+        $p   = \@args;
+
+        my $ref = $self->_track(sub {
+            $db->dbh->selectcol_arrayref($sql, undef, @{$p});
+        });
+
+        $results = $ref // [];
+        return $results;
+    }
+
+    method count ($table_name, $skeel = undef) {
+        my $table = $self->_safe_id($self->TableName($table_name));
+
+        $sql = "SELECT COUNT(*) FROM $table";
+        $p   = [];
+
+        unless ($skeel) {
+            $results = $self->_track(sub {
+                $db->dbh->selectrow_array($sql);
+            });
+            return $results;
+        }
+
+        $self->_make_where($skeel);
+
+        $results = $self->_track(sub {
+            $db->dbh->selectrow_array($sql, undef, @{$p});
+        });
+        return $results;
+    }
+
+    method _make_where ($skeel) {
+        state %VALID_OPS = map { $_ => 1 }
+          qw(= != <> < <= > >= LIKE NOT BETWEEN IS);
+
+        my @params;
+        my @parts;
+
+        for my $K (sort keys %{$skeel}) {
+            $self->_safe_id($K);  # validate column name
+
+            my $val = $skeel->{$K};
+            my $op  = '=';
+
+            if (ref $val eq 'HASH') {
+                ($op) = keys %$val;
+                $self->Exception("Invalid operator: $op")
+                  unless $VALID_OPS{uc $op};
+                $val = $val->{$op};
+            }
+
+            push @parts,  "$K $op ?";
+            push @params, $val;
+        }
+
+        $sql .= ' WHERE ' . join(' AND ', @parts) if @parts;
+        $p = \@params;
+    }
+
+    method exec ($stmt, @params) {
+        $self->Exception("exec() : SQL statement required") unless $stmt;
+
+        $sql = $stmt;
+        $p   = \@params;
+
+        my $sth = $db->dbh->prepare($stmt);
+
+        $self->_track(sub {
+            @params ? $sth->execute(@params) : $sth->execute();
+            1;
+        });
+
+        if ($DBI::err) {
+            $self->set_error($DBI::err, $DBI::errstr);
+            return;
+        }
+
+        return $sth;
+    }
+
+    method execute ($stmt, $extra = undef, $type = 'arrayref') {
+        $sql = $stmt;
+
+        $self->make_sen($extra) if $extra;
+
+        $results = $self->_track(sub {
+            if ($type eq 'hash') {
+                my $sth = $db->dbh->prepare($sql);
+                $p ? $sth->execute(@{$p}) : $sth->execute;
+                return $sth->fetchrow_hashref;
+            }
+            else {
+                return $p
+                  ? $db->dbh->selectall_arrayref($sql, { Slice => {} }, @{$p})
+                  : $db->dbh->selectall_arrayref($sql, { Slice => {} });
+            }
+        });
+    }
+
+    # CRUD
+    method insert ($table_name, $skeel, @extra) {
+        my $table = $self->TableName($table_name);
+
+        $skeel = $self->extra_args($skeel, @extra) if @extra;
+
+        my ($stmt, @bind) = $Q->insert($table, $skeel);
+
+        $sql = $stmt;
+        $self->execute_prepare(@bind);
+
+        if ($_dbd eq 'MariaDB') {
+            $last_id = $db->dbh->{mariadb_insertid};
+        }
+        elsif ($_dbd eq 'mysql') {
+            $last_id = $db->dbh->{mysql_insertid};
+        }
+        elsif ($_dbd eq 'SQLite') {
+            $last_id = $db->dbh->sqlite_last_insert_rowid();
+        }
+        elsif ($_dbd eq 'Pg') {
+            $last_id =
+              $db->dbh->last_insert_id(undef, undef, $table, undef);
+        }
+    }
+
+    method update ($table_name, $skeel, @extra) {
+        my $table = $self->TableName($table_name);
+
+        $skeel->{sen} = $self->extra_args($skeel->{sen}, @extra)
+          if @extra;
+
+        my ($stmt, @bind) =
+          $Q->update($table, $skeel->{sen}, $skeel->{where});
+
+        $sql = $stmt;
+        $self->execute_prepare(@bind);
+    }
+
+    method up ($table_name, $data, $where, $time_col = undef) {
+        if ($time_col) {
+            $self->update($table_name,
+                { sen => $data, where => $where }, time => $time_col);
+        }
+        else {
+            $self->update($table_name,
+                { sen => $data, where => $where });
+        }
+    }
+
+    method delete ($table_name, $skeel) {
+        my $table = $self->TableName($table_name);
+
+        my ($stmt, @bind) = $Q->delete($table, $skeel);
+
+        $sql = $stmt;
+        $self->execute_prepare(@bind);
+    }
+
+    method extra_args ($skeel, %args) {
+        $skeel->{ $args{time} } = $self->now() if $args{time};
+        return $skeel;
+    }
+
+    # Named parameter methods
+
+    method make_sen ($skeel) {
+        my $stmt = $sql // '';
+        my @params;
+
+        while ($stmt =~ /:([A-Za-z_]\w*)/) {
+            my $name = $1;
+            my $val  = exists $skeel->{$name} ? $skeel->{$name} : undef;
+            $stmt =~ s/\Q:$name\E/?/;
+            push @params, $val;
+        }
+
+        $sql = $stmt;
+        $p   = \@params;
+    }
+
+    # Execute helpers
+
+    method execute_prepare (@params) {
+        my $stmt = $sql // '';
+
+        $self->Exception("execute_prepare(): SQL not set")
+          unless length $stmt;
+
+        my $dbh = $db && $db->dbh
+          or $self->Exception("execute_prepare(): No DB handle");
+
+        my $sth = $dbh->prepare_cached($stmt)
+          or $self->Exception(
+            "prepare() failed: " . ($dbh->errstr // 'unknown'));
+
+        $p = \@params;
+
+        $self->_track(sub {
+            $sth->execute(@params)
+              or $self->Exception(
+                "execute() failed: " . ($sth->errstr // 'unknown'));
+            1;
+        });
+
+        $last_sql = $stmt;
+
+        return $sth;
+    }
+
+    # Validation
+
+    method TableName ($table) {
+        $self->Exception("Not defined table") unless $table;
+
+        return $table unless $_args->{tn};
+
+        $self->Exception("TableName not exist: $table")
+          unless $self->schema->tables->{$table};
+
+        return $table;
+    }
+
+    method Exception ($msg) {
+        my $full = "Exception: $msg"
+          . ($_last_error ? " - Last error: $_last_error" : "");
+
+        if ($_args && !$_args->{DBI}->{RaiseError} && !$_args->{DBI}->{PrintError}) {
+            return;  # Both off: silent
+        }
+
+        croak $full;
+    }
 }
 
 1;
@@ -579,351 +641,371 @@ __END__
 
 =head1 NAME
 
-    DBIx::Fast - DBI fast & easy (another one...)
+DBIx::Fast - DBI fast & easy
 
 =head1 SYNOPSIS
 
     use DBIx::Fast;
 
-    $db = DBIx::Fast->new( dsn => 'dbi:MariaDB:database=test:host', user => 'test', password => 'test' );
+    # Connect via DSN
+    my $db = DBIx::Fast->new(
+        dsn      => 'dbi:MariaDB:database=mydb:localhost',
+        user     => 'root',
+        password => 'secret',
+    );
 
-    $db = DBIx::Fast->new( db => 'test', user => 'u', password => 'p', driver => 'MariaDB', trace => '1', profile => '!Statement:!MethodName' );
+    # Connect via URI
+    my $db = DBIx::Fast->new( dsn => 'mariadb://root:secret@localhost:3306/mydb' );
 
-    $db->all('SELECT * FROM test WHERE 1');
+    # SQLite shortcut
+    my $db = DBIx::Fast->new( SQLite => '/path/to/db.sqlite' );
 
-    $Results = $db->results;
-    $Results = $db->all('SELECT * FROM test WHERE expire > ?',$time);
+    # Dependency injection
+    my $db = DBIx::Fast->new( db => $connector, driver => 'SQLite' );
 
-    $Hash = $db->hash('SELECT * FROM test WHERE id = ?',$id);
-    $Hash = $db->results;
+    # Queries
+    $db->all('SELECT * FROM users WHERE active = ?', 1);
+    my $rows = $db->results;
 
-    @Array = $db->flat('SELECT id FROM users');
+    my $user = $db->hash('SELECT * FROM users WHERE id = ?', $id);
+    my $name = $db->val('SELECT name FROM users WHERE id = ?', $id);
+    my @ids  = $db->flat('SELECT id FROM users');
+    my $total = $db->count('users', { active => 1 });
 
-    $Value = $db->val('SELECT name FROM test WHERE id = ?',1);
+    # CRUD
+    $db->insert('users', { name => 'Alice', status => 1 }, time => 'created_at');
+    $db->up('users', { name => 'Bob' }, { id => 1 });
+    $db->up('users', { name => 'Bob' }, { id => 1 }, 'updated_at');
+    $db->delete('users', { id => 1 });
 
-    $db->insert('table', { name => 'New Name', status  => 1 }, time => 'create_time');
+    # Transactions
+    $db->txn(sub {
+        $db->insert('orders', { total => 100 });
+        $db->insert('order_items', { order_id => $db->last_id, product => 'Widget' });
+    });
 
-    $db->update('table', { sen => { name => 'update t3st' }, where => { id => 1 } });
-    $db->update('table', { sen => { name => 'update t3st' }, where => { id => 1 } }, time => 'mod_time');
-
-    $db->up('table', { name => 'Update Name' } , { id => 1 } );
-    $db->up('table', { name => 'Update Name' } , { id => 1 } , time => 'mod_time');
-
-    $db->delete('test', { id => 1 });
-
-    $db->last_sql;
-    $db->last_id;
-
-    $db->last_error;
-    $db->errors;
-
+    # Named parameters
+    $db->execute('SELECT * FROM users WHERE name = :name', { name => 'Alice' });
 
 =head1 DESCRIPTION
 
-=head1 SUBROUTINES/METHODS
+DBIx::Fast is a lightweight database abstraction layer built on top of
+L<DBI>, L<DBIx::Connector>, and L<SQL::Abstract>. It provides fast, simple
+access to SQLite, PostgreSQL, MariaDB, and MySQL databases with Object::Pad.
 
-=over
+Requires Perl v5.38 or later.
 
-=item Tables
+=head1 CONSTRUCTOR
 
- Tables DB
+=head2 new
 
-=item Q
+    my $db = DBIx::Fast->new(%args);
 
- SQL::Abstractor
+Accepted parameters:
 
-=item args
+=over 4
 
- Args to invocate DBIx::Fast
+=item C<dsn> - DBI DSN string or URI (C<mariadb://user:pass@host:port/db>)
 
-=item db
+=item C<SQLite> - Path to SQLite database file (shortcut)
 
- DataBase Handle
+=item C<db> - Database name string or pre-built L<DBIx::Connector> object
 
-=item dbd
+=item C<driver> - Database driver: SQLite, Pg, MariaDB, mysql
 
- DataBase Driver
+=item C<user>, C<password>, C<host> - Connection credentials
 
-=item dsn
+=item C<RaiseError>, C<PrintError>, C<AutoCommit> - DBI attributes (defaults: 1, 0, 1)
 
- DSN - Data Source Name
+=item C<tn> - Enable table name validation (default: 0)
 
-=item errors
+=item C<abstract> - Enable SQL::Abstract (default: 1)
 
- All errors
-
-=item p
-
- Params to bind
-
-=item sql
-
- SQL Sentence
-
-=item last_sql
-
- Last SQL Executed
-
-=item last_id
-
- Last insert ID
-
-=item last_error
-
- Last error
-
-=item results
-
- Last result
+=item C<trace>, C<profile> - DBI tracing/profiling options
 
 =back
 
-=head2 C<now>
+=head1 ACCESSORS
 
-   Timestamp Mysql format
+=head2 db
 
-=cut
+L<DBIx::Connector> instance (read/write).
 
-=head2 C<set_error>
+=head2 dbd
 
-    Add error to the array
+Database driver name: SQLite, Pg, MariaDB, or mysql (read-only).
 
-=cut
+=head2 dsn
 
-=head2 C<BUILD>
+Processed DSN string (read-only).
 
-    Build Moo
+=head2 Q
 
-=cut
+L<SQL::Abstract> instance (read/write).
 
-=head2 C<_check_dbd>
+=head2 sql
 
-    Set DataBase Driver
+Current SQL statement (read/write).
 
-=cut
+=head2 last_sql
 
-=head2 C<_dsn_dbi>
+Last executed SQL statement (read/write).
 
-    DSN to DBI String
+=head2 p
 
-=cut
+Current bind parameters arrayref (read/write).
 
-=head2 C<_check_dsn>
+=head2 results
 
-    Check DSN string
+Last query result (read/write).
 
-=cut
+=head2 last_id
 
-=head2 C<make_dsn>
+Last insert ID (read/write).
 
-    Make DSN DBI string
+=head2 errors
 
-=cut
+All errors as arrayref (read-only).
 
-=head2 C<_dsn_to_dbi>
+=head2 last_error
 
-    Return a DBI DSN
+Last error message string (read-only).
 
-=cut
+=head2 args
 
-=head2 C<profile>
+Processed constructor configuration hashref (read-only).
 
-    Save profile log : dbix-fast--PID.log
+=head1 QUERY METHODS
 
-=cut
+=head2 all
 
-=head2 C<all>
+    $db->all('SELECT * FROM users WHERE id > ?', 10);
+    my $rows = $db->results;  # arrayref of hashrefs
 
-    Execute a SQL sentence and return all data in arrayref
+Executes SQL and stores all rows in C<results>.
 
-=cut
+=head2 hash
 
-=head2 C<flat>
+    $db->hash('SELECT * FROM users WHERE id = ?', 1);
+    my $row = $db->results;  # hashref
 
-    Execute SQL and return array
+Executes SQL and stores a single row in C<results>.
 
-=cut
+=head2 val
 
-=head2 C<hash>
+    my $name = $db->val('SELECT name FROM users WHERE id = ?', 1);
 
-    Execute a SQL sentence and return one hash
+Executes SQL and returns a single scalar value.
 
-=cut
+=head2 flat
 
-=head2 C<val>
+    my @names = $db->flat('SELECT name FROM users');
 
-    Return a one value
+Executes SQL and returns a flat list of values.
 
-=cut
+=head2 array
 
-=head2 C<array>
+    $db->array('SELECT name FROM users');
+    my $names = $db->results;  # arrayref
 
-    Execute a SQL sentence and return array
+Executes SQL and stores a single column as arrayref in C<results>.
 
-=cut
+=head2 count
 
-=head2 C<count>
+    my $total = $db->count('users');
+    my $active = $db->count('users', { status => 1 });
 
-    Return count total from a table
+Returns row count, optionally filtered by WHERE conditions.
 
-=cut
+=head2 exec
 
-=head2 C<make_where>
+    my $sth = $db->exec('CREATE TABLE foo (id INT)');
+    my $sth = $db->exec('INSERT INTO foo VALUES (?)', 42);
 
-=cut
+Executes raw SQL with optional bind parameters. Records query in profiler
+if initialized. Returns the statement handle.
 
-=head2 C<execute>
+=head2 execute
 
-    Execute SQL
+    $db->execute('SELECT * FROM users WHERE name = :name', { name => 'Alice' });
+    $db->execute('SELECT * FROM users WHERE id = :id', { id => 1 }, 'hash');
 
-=cut
+Executes SQL with named parameter substitution (C<:name> syntax). Third
+argument selects result type: C<arrayref> (default) or C<hash>.
 
-=head2 C<up>
+=head1 CRUD METHODS
 
-    Update shortcut statment : up( table , data , where , time )
+=head2 insert
 
-    $db->up('table', { name => "New Name" } , { id => 1 } );
-    $db->up('table', { name => "New Name" } , { id => 1 } , time => 'time_update' );
+    $db->insert('users', { name => 'Alice', status => 1 });
+    $db->insert('users', { name => 'Alice' }, time => 'created_at');
+    my $id = $db->last_id;
 
-=cut
+Inserts a row using L<SQL::Abstract>. Sets C<last_id> automatically based
+on the database driver.
 
-=head2 C<update>
+=head2 update
 
-        $db->update('test', {
-                           sen   => { uid => 1 , name => 'mrtest' ,status => 1 },
-                           where => { id => 33 },
-        }, time => 'update_time');
+    $db->update('users', {
+        sen   => { name => 'Bob', status => 1 },
+        where => { id => 1 },
+    });
+    $db->update('users', {
+        sen   => { name => 'Bob' },
+        where => { id => 1 },
+    }, time => 'updated_at');
 
-=cut
+Updates rows using L<SQL::Abstract>. Pass C<time =E<gt> 'column_name'> to
+auto-set a timestamp column to C<now()>.
 
-=head2 C<insert>
+=head2 up
 
-    Insert statment
+    $db->up('users', { name => 'Bob' }, { id => 1 });
+    $db->up('users', { name => 'Bob' }, { id => 1 }, 'updated_at');
 
-    $db->insert('test',
-           {
-               name => 'tester',
-               status => 0
-           }, time => 'date' );
+Shortcut for C<update>. Arguments: table, data hashref, where hashref,
+optional time column name (positional).
 
-=cut
+=head2 delete
 
-=head2 C<delete>
+    $db->delete('users', { id => 1 });
 
-   Delete statment : delete( table , hash );
+Deletes rows using L<SQL::Abstract>.
 
-   $db->delete('test', { id => $db->last_id });
-   $db->delete('test', { id => 1 });
+=head1 SUBSYSTEMS
 
-=cut
+=head2 schema
 
-=head2 C<extra_args>
+    my $schema = $db->schema;
 
-    Time : NOW() time in mysql format
+Returns the L<DBIx::Fast::Schema> instance (lazy-loaded) for table
+introspection.
 
-=cut
+=head2 transaction
 
-=head2 C<make_sen>
+    my $tx = $db->transaction;
 
-    FIXME : Hacer con execute_prepare
+Returns the L<DBIx::Fast::Transaction> instance (lazy-loaded).
 
-=cut
+=head2 txn
 
-=head2 C<q>
+    $db->txn(sub { ... });
+    $db->txn(sub { ... }, { max_retries => 5 });
 
-    Make Query
+Shortcut for C<< $db->transaction->do(...) >>. Executes a code block inside
+a transaction with automatic commit/rollback and deadlock retry.
 
-=cut
+=head2 profiler
 
-=head2 C<execute_prepare>
+    my $profiler = $db->profiler;
 
-    Exute and prepare
+Returns the driver-specific profile instance (L<DBIx::Fast::Profile::MariaDB>,
+L<DBIx::Fast::Profile::SQLite>, etc.) for native database diagnostics.
+Lazy-loaded on first access.
 
-=cut
+=head2 tracker
 
-=head2 C<TableName>
+    my $tracker = $db->tracker;
 
-    Table name any character or _
+Returns the L<DBIx::Fast::Profiler> instance for query tracking. Once
+activated, all queries executed through C<all>, C<hash>, C<val>, C<flat>,
+C<array>, C<exec>, C<insert>, C<update>, C<up>, and C<delete> are recorded
+with timing information.
 
-=cut
+    # Activate tracking
+    $db->tracker;
 
-=head2 C<Exception>
+    # Run some queries
+    $db->all('SELECT * FROM users');
+    $db->insert('logs', { action => 'login' });
+    $db->up('users', { last_login => $db->now }, { id => 1 });
 
-    Make a exception Carp()
+    # Get statistics
+    my $stats = $db->tracker->get_stats;
+    printf "Queries: %d, Total: %.4fs, Avg: %.4fs\n",
+        $stats->{total_queries}, $stats->{total_time}, $stats->{avg_time};
 
-=cut
+    # Slow queries
+    my $slow = $db->tracker->get_slow_queries(5);
+    for my $q (@$slow) {
+        printf "%.4fs - %s\n", $q->{duration}, $q->{sql};
+    }
+
+    # Stats by type (SELECT, INSERT, UPDATE, DELETE)
+    my $by_type = $db->tracker->get_detailed_stats;
+
+    # Print formatted report
+    $db->tracker->print_stats;
+
+    # Clear recorded queries
+    $db->tracker->clear;
+
+=head2 load_extension
+
+    my $ext = $db->load_extension('Schema');
+
+Dynamically loads and caches a C<DBIx::Fast::*> extension module.
+
+=head1 UTILITY METHODS
+
+=head2 now
+
+Returns the current timestamp in MySQL format (C<YYYY-MM-DD HH:MM:SS>).
+
+=head2 set_error
+
+    $db->set_error($code, $message);
+
+Appends an error to the C<errors> array and updates C<last_error>.
+
+=head2 make_sen
+
+    $db->sql('SELECT * FROM users WHERE name = :name AND age = :age');
+    $db->make_sen({ name => 'Alice', age => 30 });
+    # $db->sql is now 'SELECT * FROM users WHERE name = ? AND age = ?'
+    # $db->p is ['Alice', 30]
+
+Replaces named placeholders (C<:name>) with C<?> in order of appearance
+in the SQL string. Supports duplicate placeholders.
+
+=head2 q
+
+    $db->q('SELECT * FROM users WHERE id = ?', 1);
+
+Sets C<sql> and C<p> (bind parameters) for subsequent use.
+
+=head2 execute_prepare
+
+    $db->sql('INSERT INTO users (name) VALUES (?)');
+    $db->execute_prepare('Alice');
+
+Prepares and executes the current C<sql> with bind parameters.
+
+=head2 TableName
+
+    my $table = $db->TableName('users');
+
+Validates a table name. When C<tn =E<gt> 1> is set, checks that the table
+exists in the schema cache.
+
+=head2 Exception
+
+    $db->Exception("Something went wrong");
+
+Throws an exception via C<croak>, respecting C<RaiseError> and C<PrintError>
+settings.
+
+=head1 SEE ALSO
+
+L<DBI>, L<DBIx::Connector>, L<SQL::Abstract>, L<Object::Pad>
 
 =head1 AUTHOR
 
-=head1 BUGS
-
-Please report any bugs or feature requests to C<bug-business-es-nif at rt.cpan.org>, or through
-the web interface at L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=DBIx-Fast>.  I will be notified, and then you'll
-automatically be notified of progress on your bug as I make changes.
-
-=head1 SUPPORT
-
-You can find documentation for this module with the perldoc command.
-
-    perldoc DBIx::Fast
-
-You can also look for information at:
-
-=over 3
-
-=item * RT: CPAN's request tracker (report bugs here)
-
-L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=DBIx-Fast>
-
-=item * MetaCPAN
-
-L<https://metacpan.org/pod/DBIx::Fast>
-
-=item * Search CPAN
-
-L<http://search.cpan.org/dist/DBIx-Fast/>
-
-=back
+Harun Delgado E<lt>hdp@nurmol.comE<gt>
 
 =head1 LICENSE AND COPYRIGHT
 
-This program is free software; you can redistribute it and/or modify it
-under the terms of the the Artistic License (2.0). You may obtain a
-copy of the full license at:
-
+This is free software under the Artistic License 2.0.
 L<http://www.perlfoundation.org/artistic_license_2_0>
 
-Any use, modification, and distribution of the Standard or Modified
-Versions is governed by this Artistic License. By using, modifying or
-distributing the Package, you accept this license. Do not use, modify,
-or distribute the Package, if you do not accept this license.
-
-If your Modified Version has been derived from a Modified Version made
-by someone other than you, you are nevertheless required to ensure that
-your Modified Version complies with the requirements of this license.
-
-This license does not grant you the right to use any trademark, service
-mark, tradename, or logo of the Copyright Holder.
-
-This license includes the non-exclusive, worldwide, free-of-charge
-patent license to make, have made, use, offer to sell, sell, import and
-otherwise transfer the Package with respect to any patent claims
-licensable by the Copyright Holder that are necessarily infringed by the
-Package. If you institute patent litigation (including a cross-claim or
-counterclaim) against any party alleging that the Package constitutes
-direct or contributory patent infringement, then this Artistic License
-to you shall terminate on the date that such litigation is filed.
-
-Disclaimer of Warranty: THE PACKAGE IS PROVIDED BY THE COPYRIGHT HOLDER
-AND CONTRIBUTORS "AS IS' AND WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES.
-THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
-PURPOSE, OR NON-INFRINGEMENT ARE DISCLAIMED TO THE EXTENT PERMITTED BY
-YOUR LOCAL LAW. UNLESS REQUIRED BY LAW, NO COPYRIGHT HOLDER OR
-CONTRIBUTOR WILL BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, OR
-CONSEQUENTIAL DAMAGES ARISING IN ANY WAY OUT OF THE USE OF THE PACKAGE,
-EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-
 =cut
-
-1;

@@ -5,11 +5,11 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
 	      NAME             => 'DBIx::Fast',
 	      AUTHOR           => q{Harun Delgado <hdp@nurmol.com>},
-	      ABSTRACT         => 'DBIx::Fast - DBI fast & easy (another one...)',
+	      ABSTRACT_FROM    => 'lib/DBIx/Fast.pm',
 	      VERSION_FROM     => 'lib/DBIx/Fast.pm',
 	      LICENSE          => 'artistic_2',
 	      PL_FILES         => {},
-	      MIN_PERL_VERSION => 5.008,
+	      MIN_PERL_VERSION => 'v5.38',
 	      CONFIGURE_REQUIRES =>
 	      {
 	       'ExtUtils::MakeMaker' => 0,
@@ -18,13 +18,16 @@ WriteMakefile(
 	      {
 	       'Test::More'      => 0,
 	       'Test::Exception' => 0.43,
-	       'DBD::SQLite'     => 1.50,
+	       'DBD::SQLite'     => 1.74,
 	      },
 	      PREREQ_PM =>
 	      {
-	       'Moo'             => 1,
+	       'Object::Pad'     => 0.807,
 	       'SQL::Abstract'   => 2.00,
 	       'DBIx::Connector' => 0.53,
+	       'Time::HiRes'     => 0,
+	       'JSON'            => 0,
+	       'Term::ANSIColor' => 0,
 	      },
 	      META_MERGE =>
               {

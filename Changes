@@ -1,5 +1,20 @@
 Revision history for DBIx-Fast
 
+0.16	20/03/26
+	- Migration from Moo to Object::Pad (requires Perl v5.38+)
+	- New: tracker() - query profiling across all methods (all/hash/val/flat/array/exec/insert/update/delete)
+	- New: Profile::Base, Profile::MariaDB, Profile::SQLite (driver-specific diagnostics)
+	- New: Transaction module with nested support, savepoints, deadlock retry
+	- Removed: up2() (unused), Query.pm (unused), execute_prepare2 (duplicate), make_sen old (buggy)
+	- Renamed: make_senN → make_sen (correct implementation)
+	- Performance: statement caching (prepare_cached), inlined query methods, _make_where with join
+	- Bug fixes: Schema typos, HandleError return 0, Time::HiRes import, `rows` keyword MariaDB 11+
+	- Bug fixes: Profile::MariaDB init (execute→exec), session stats columns, getrusage optional
+	- Tests: 147 SQLite + 34 MariaDB + 14 profiler
+	- Updated CI: Perl 5.38/5.40, bookworm, Object::Pad
+	- Full POD documentation on all 8 modules
+	- Added examples/profiler-mariadb.pl
+
 0.15	06/09/24
 	- args : SQLite
 	

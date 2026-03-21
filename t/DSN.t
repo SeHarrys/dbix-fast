@@ -8,7 +8,7 @@ use DBIx::Fast;
 eval "use DBD::SQLite 1.74";
 plan skip_all => "DBD::SQLite 1.74" if $@;
 
-my $db = DBIx::Fast->new( SQLite => 't/db/test.db' , PrintError => 1 );
+my $db = DBIx::Fast->new( SQLite => 't/db/test.db' , PrintError => 1 , RaiseError => 0);
 
 my $test = {
     user => 'tester',
@@ -33,7 +33,7 @@ for my $Key (keys %{$DSN}) {
     is $db->_dsn_to_dbi($Key),$DSN->{$Key},'_dsn_to_dbi : '.$Key;
 }
 
-is $db->_dsn_to_dbi('SSS://sql:pass@host:/dbname'),undef,'_dsn_to_dbi : Bad string';
-is $db->_dsn_to_dbi('sql://user@host/dbname')     ,undef,'_dsn_to_dbi : Bad DSN';
+{ local $SIG{__DIE__} = sub { like($_[0], qr/Exception: _dsn_to_dbi/,"_dsn_to_dbi : Bad string"); }; eval { $db->_dsn_to_dbi('SSS://sql:pass@host:/dbname') }; }
+{ local $SIG{__DIE__} = sub { like($_[0], qr/Exception: _dsn_to_dbi/,"_dsn_to_dbi : Bad DSN");    }; eval { $db->_dsn_to_dbi('sql://user@host/dbname') }; }
 
 done_testing();

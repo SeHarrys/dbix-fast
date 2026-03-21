@@ -1,17 +1,37 @@
 Changes
-ignore.txt
 lib/DBIx/Fast.pm
+lib/DBIx/Fast/Base.pm
+lib/DBIx/Fast/Profiler.pm
+lib/DBIx/Fast/Profile/Base.pm
+lib/DBIx/Fast/Profile/MariaDB.pm
+lib/DBIx/Fast/Profile/SQLite.pm
+lib/DBIx/Fast/Schema.pm
+lib/DBIx/Fast/Transaction.pm
 Makefile.PL
-MANIFEST				This list of files
+MANIFEST			This list of files
+META.json			Module JSON meta-data (added by MakeMaker)
+META.yml			Module YAML meta-data (added by MakeMaker)
 README
+t/00-load.t
+t/02-schema.t
+t/args.t
 t/db/test.db
 t/db/test.sqlite
-t/00-load.t
-t/functions.t
+t/dbix-fast.t
+t/dependency_injection.t
+t/driver/MariaDB.t
+t/driver/mysql.t
+t/driver/Pg.t
+t/DSN.t
 t/exception.t
+t/functions.t
 t/methods.t
+t/missing_coverage.t
 t/pod.t
+t/profiler.t
+t/schema.t
 t/sql-abstract.t
+t/transaction.t
 t/x_log.t
-META.yml                                 Module YAML meta-data (added by MakeMaker)
-META.json                                Module JSON meta-data (added by MakeMaker)
+.github/workflows/linux.yml
+.github/workflows/macos.yml

@@ -2,7 +2,34 @@
 .*~
 *.tar.gz
 *.tgz
+*.bak
+# Build artifacts
+Makefile
 Makefile.old
-blib/*
+MYMETA.json
+MYMETA.yml
+MANIFEST.bak
+blib/
+pm_to_blib
+
+# macOS metadata
+._*
+.DS_Store
+
+# Emacs
 \#*
+*Minibuf*
+
+# Profiling
+nytprof.out
+nytprof/
+
+# DBI trace/profile logs
+dbix-fast-trace
+dbix-fast-*.log
+
+# Scripts and test helpers
+bin/*
+tmp/*
 Test.pl
+benck.pl

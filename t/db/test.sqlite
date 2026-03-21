@@ -4,3 +4,17 @@ CREATE TABLE test (
        	status	     BOOLEAN,
        	name	     VARCHAR(48)
 );
+
+CREATE TABLE test2 (
+        id INTEGER   PRIMARY KEY,
+        time         DATETIME,
+        status       BOOLEAN,
+        name         VARCHAR(48)
+);
+
+CREATE TABLE test3 (
+        id INTEGER   PRIMARY KEY,
+        time         DATETIME,
+        status       BOOLEAN,
+        name         VARCHAR(48)
+);

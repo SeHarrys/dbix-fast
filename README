@@ -1,234 +1,308 @@
 NAME
-        DBIx::Fast - DBI fast & easy (another one...)
+    DBIx::Fast - DBI fast & easy
 
 SYNOPSIS
         use DBIx::Fast;
 
-        $db = DBIx::Fast->new( dsn => 'dbi:MariaDB:database=test:host', user => 'test', password => 'test' );
+        # Connect via DSN
+        my $db = DBIx::Fast->new(
+            dsn      => 'dbi:MariaDB:database=mydb:localhost',
+            user     => 'root',
+            password => 'secret',
+        );
 
-        $db = DBIx::Fast->new( db => 'test', user => 'u', password => 'p', driver => 'MariaDB', trace => '1', profile => '!Statement:!MethodName' );
+        # Connect via URI
+        my $db = DBIx::Fast->new( dsn => 'mariadb://root:secret@localhost:3306/mydb' );
 
-        $db->all('SELECT * FROM test WHERE 1');
+        # SQLite shortcut
+        my $db = DBIx::Fast->new( SQLite => '/path/to/db.sqlite' );
 
-        $Results = $db->results;
-        $Results = $db->all('SELECT * FROM test WHERE expire > ?',$time);
+        # Dependency injection
+        my $db = DBIx::Fast->new( db => $connector, driver => 'SQLite' );
 
-        $Hash = $db->hash('SELECT * FROM test WHERE id = ?',$id);
-        $Hash = $db->results;
+        # Queries
+        $db->all('SELECT * FROM users WHERE active = ?', 1);
+        my $rows = $db->results;
 
-        @Array = $db->flat('SELECT id FROM users');
+        my $user = $db->hash('SELECT * FROM users WHERE id = ?', $id);
+        my $name = $db->val('SELECT name FROM users WHERE id = ?', $id);
+        my @ids  = $db->flat('SELECT id FROM users');
+        my $total = $db->count('users', { active => 1 });
 
-        $Value = $db->val('SELECT name FROM test WHERE id = ?',1);
+        # CRUD
+        $db->insert('users', { name => 'Alice', status => 1 }, time => 'created_at');
+        $db->up('users', { name => 'Bob' }, { id => 1 });
+        $db->up('users', { name => 'Bob' }, { id => 1 }, 'updated_at');
+        $db->delete('users', { id => 1 });
 
-        $db->insert('table', { name => 'New Name', status  => 1 }, time => 'create_time');
+        # Transactions
+        $db->txn(sub {
+            $db->insert('orders', { total => 100 });
+            $db->insert('order_items', { order_id => $db->last_id, product => 'Widget' });
+        });
 
-        $db->update('table', { sen => { name => 'update t3st' }, where => { id => 1 } });
-        $db->update('table', { sen => { name => 'update t3st' }, where => { id => 1 } }, time => 'mod_time');
-
-        $db->up('table', { name => 'Update Name' } , { id => 1 } );
-        $db->up('table', { name => 'Update Name' } , { id => 1 } , time => 'mod_time');
-
-        $db->delete('test', { id => 1 });
-
-        $db->last_sql;
-        $db->last_id;
-
-        $db->last_error;
-        $db->errors;
+        # Named parameters
+        $db->execute('SELECT * FROM users WHERE name = :name', { name => 'Alice' });
 
 DESCRIPTION
-SUBROUTINES/METHODS
-    Q
-         SQL::Abstractor
+    DBIx::Fast is a lightweight database abstraction layer built on top of
+    DBI, DBIx::Connector, and SQL::Abstract. It provides fast, simple access
+    to SQLite, PostgreSQL, MariaDB, and MySQL databases with Object::Pad.
 
-    args
-         Args to invocate DBIx::Fast
+    Requires Perl v5.38 or later.
 
-    db
-         DataBase Handle
+CONSTRUCTOR
+  new
+        my $db = DBIx::Fast->new(%args);
 
-    dbd
-         DataBase Driver
+    Accepted parameters:
 
-    dsn
-         DSN - Data Source Name
+    "dsn" - DBI DSN string or URI ("mariadb://user:pass@host:port/db")
+    "SQLite" - Path to SQLite database file (shortcut)
+    "db" - Database name string or pre-built DBIx::Connector object
+    "driver" - Database driver: SQLite, Pg, MariaDB, mysql
+    "user", "password", "host" - Connection credentials
+    "RaiseError", "PrintError", "AutoCommit" - DBI attributes (defaults: 1,
+    0, 1)
+    "tn" - Enable table name validation (default: 0)
+    "abstract" - Enable SQL::Abstract (default: 1)
+    "trace", "profile" - DBI tracing/profiling options
 
-    errors
-         All errors
+ACCESSORS
+  db
+    DBIx::Connector instance (read/write).
 
-    p
-         Params to bind
+  dbd
+    Database driver name: SQLite, Pg, MariaDB, or mysql (read-only).
 
-    sql
-         SQL Sentence
+  dsn
+    Processed DSN string (read-only).
 
-    last_sql
-         Last SQL Executed
+  Q
+    SQL::Abstract instance (read/write).
 
-    last_id
-         Last insert ID
+  sql
+    Current SQL statement (read/write).
 
-    last_error
-         Last error
+  last_sql
+    Last executed SQL statement (read/write).
 
-    results
-         Last result
+  p
+    Current bind parameters arrayref (read/write).
 
-  "now"
-       Timestamp Mysql format
+  results
+    Last query result (read/write).
 
-  "set_error"
-        Add error to the array
+  last_id
+    Last insert ID (read/write).
 
-  "BUILD"
-        Build Moo
+  errors
+    All errors as arrayref (read-only).
 
-  "_check_dbd"
-        Set DataBase Driver
+  last_error
+    Last error message string (read-only).
 
-  "_dsn_dbi"
-        DSN to DBI String
+  args
+    Processed constructor configuration hashref (read-only).
 
-  "_check_dsn"
-        Check DSN string
+QUERY METHODS
+  all
+        $db->all('SELECT * FROM users WHERE id > ?', 10);
+        my $rows = $db->results;  # arrayref of hashrefs
 
-  "make_dsn"
-        Make DSN DBI string
+    Executes SQL and stores all rows in "results".
 
-  "_dsn_to_dbi"
-        Return a DBI DSN
+  hash
+        $db->hash('SELECT * FROM users WHERE id = ?', 1);
+        my $row = $db->results;  # hashref
 
-  "profile"
-        Save profile log : dbix-fast--PID.log
+    Executes SQL and stores a single row in "results".
 
-  "all"
-        Execute a SQL sentence and return all data in arrayref
+  val
+        my $name = $db->val('SELECT name FROM users WHERE id = ?', 1);
 
-  "flat"
-        Execute SQL and return array
+    Executes SQL and returns a single scalar value.
 
-  "hash"
-        Execute a SQL sentence and return one hash
+  flat
+        my @names = $db->flat('SELECT name FROM users');
 
-  "val"
-        Return a one value
+    Executes SQL and returns a flat list of values.
 
-  "array"
-        Execute a SQL sentence and return array
+  array
+        $db->array('SELECT name FROM users');
+        my $names = $db->results;  # arrayref
 
-  "count"
-        Return count total from a table
+    Executes SQL and stores a single column as arrayref in "results".
 
-  "make_where"
-  "execute"
-        Execute SQL
+  count
+        my $total = $db->count('users');
+        my $active = $db->count('users', { status => 1 });
 
-  "up"
-        Update shortcut statment : up( table , data , where , time )
+    Returns row count, optionally filtered by WHERE conditions.
 
-        $db->up('table', { name => "New Name" } , { id => 1 } );
-        $db->up('table', { name => "New Name" } , { id => 1 } , time => 'time_update' );
+  exec
+        my $sth = $db->exec('CREATE TABLE foo (id INT)');
+        my $sth = $db->exec('INSERT INTO foo VALUES (?)', 42);
 
-  "update"
-            $db->update('test', {
-                               sen   => { uid => 1 , name => 'mrtest' ,status => 1 },
-                               where => { id => 33 },
-            }, time => 'update_time');
+    Executes raw SQL with optional bind parameters. Records query in
+    profiler if initialized. Returns the statement handle.
 
-  "insert"
-        Insert statment
+  execute
+        $db->execute('SELECT * FROM users WHERE name = :name', { name => 'Alice' });
+        $db->execute('SELECT * FROM users WHERE id = :id', { id => 1 }, 'hash');
 
-        $db->insert('test',
-               {
-                   name => 'tester',
-                   status => 0
-               }, time => 'date' );
+    Executes SQL with named parameter substitution (":name" syntax). Third
+    argument selects result type: "arrayref" (default) or "hash".
 
-  "delete"
-       Delete statment : delete( table , hash );
+CRUD METHODS
+  insert
+        $db->insert('users', { name => 'Alice', status => 1 });
+        $db->insert('users', { name => 'Alice' }, time => 'created_at');
+        my $id = $db->last_id;
 
-       $db->delete('test', { id => $db->last_id });
-       $db->delete('test', { id => 1 });
+    Inserts a row using SQL::Abstract. Sets "last_id" automatically based on
+    the database driver.
 
-  "extra_args"
-        Time : NOW() time in mysql format
+  update
+        $db->update('users', {
+            sen   => { name => 'Bob', status => 1 },
+            where => { id => 1 },
+        });
+        $db->update('users', {
+            sen   => { name => 'Bob' },
+            where => { id => 1 },
+        }, time => 'updated_at');
 
-  "make_sen"
-        FIXME : Hacer con execute_prepare
+    Updates rows using SQL::Abstract. Pass "time => 'column_name'" to
+    auto-set a timestamp column to now().
 
-  "q"
-        Make Query
+  up
+        $db->up('users', { name => 'Bob' }, { id => 1 });
+        $db->up('users', { name => 'Bob' }, { id => 1 }, 'updated_at');
 
-  "execute_prepare"
-        Exute and prepare
+    Shortcut for "update". Arguments: table, data hashref, where hashref,
+    optional time column name (positional).
 
-  "TableName"
-        Table name any character or _
+  delete
+        $db->delete('users', { id => 1 });
 
-  "Exception"
-        Make a exception Carp()
+    Deletes rows using SQL::Abstract.
+
+SUBSYSTEMS
+  schema
+        my $schema = $db->schema;
+
+    Returns the DBIx::Fast::Schema instance (lazy-loaded) for table
+    introspection.
+
+  transaction
+        my $tx = $db->transaction;
+
+    Returns the DBIx::Fast::Transaction instance (lazy-loaded).
+
+  txn
+        $db->txn(sub { ... });
+        $db->txn(sub { ... }, { max_retries => 5 });
+
+    Shortcut for "$db->transaction->do(...)". Executes a code block inside a
+    transaction with automatic commit/rollback and deadlock retry.
+
+  profiler
+        my $profiler = $db->profiler;
+
+    Returns the driver-specific profile instance
+    (DBIx::Fast::Profile::MariaDB, DBIx::Fast::Profile::SQLite, etc.) for
+    native database diagnostics. Lazy-loaded on first access.
+
+  tracker
+        my $tracker = $db->tracker;
+
+    Returns the DBIx::Fast::Profiler instance for query tracking. Once
+    activated, all queries executed through "all", "hash", "val", "flat",
+    "array", "exec", "insert", "update", "up", and "delete" are recorded
+    with timing information.
+
+        # Activate tracking
+        $db->tracker;
+
+        # Run some queries
+        $db->all('SELECT * FROM users');
+        $db->insert('logs', { action => 'login' });
+        $db->up('users', { last_login => $db->now }, { id => 1 });
+
+        # Get statistics
+        my $stats = $db->tracker->get_stats;
+        printf "Queries: %d, Total: %.4fs, Avg: %.4fs\n",
+            $stats->{total_queries}, $stats->{total_time}, $stats->{avg_time};
+
+        # Slow queries
+        my $slow = $db->tracker->get_slow_queries(5);
+        for my $q (@$slow) {
+            printf "%.4fs - %s\n", $q->{duration}, $q->{sql};
+        }
+
+        # Stats by type (SELECT, INSERT, UPDATE, DELETE)
+        my $by_type = $db->tracker->get_detailed_stats;
+
+        # Print formatted report
+        $db->tracker->print_stats;
+
+        # Clear recorded queries
+        $db->tracker->clear;
+
+  load_extension
+        my $ext = $db->load_extension('Schema');
+
+    Dynamically loads and caches a "DBIx::Fast::*" extension module.
+
+UTILITY METHODS
+  now
+    Returns the current timestamp in MySQL format ("YYYY-MM-DD HH:MM:SS").
+
+  set_error
+        $db->set_error($code, $message);
+
+    Appends an error to the "errors" array and updates "last_error".
+
+  make_sen
+        $db->sql('SELECT * FROM users WHERE name = :name AND age = :age');
+        $db->make_sen({ name => 'Alice', age => 30 });
+        # $db->sql is now 'SELECT * FROM users WHERE name = ? AND age = ?'
+        # $db->p is ['Alice', 30]
+
+    Replaces named placeholders (":name") with "?" in order of appearance in
+    the SQL string. Supports duplicate placeholders.
+
+  q
+        $db->q('SELECT * FROM users WHERE id = ?', 1);
+
+    Sets "sql" and "p" (bind parameters) for subsequent use.
+
+  execute_prepare
+        $db->sql('INSERT INTO users (name) VALUES (?)');
+        $db->execute_prepare('Alice');
+
+    Prepares and executes the current "sql" with bind parameters.
+
+  TableName
+        my $table = $db->TableName('users');
+
+    Validates a table name. When "tn => 1" is set, checks that the table
+    exists in the schema cache.
+
+  Exception
+        $db->Exception("Something went wrong");
+
+    Throws an exception via "croak", respecting "RaiseError" and
+    "PrintError" settings.
+
+SEE ALSO
+    DBI, DBIx::Connector, SQL::Abstract, Object::Pad
 
 AUTHOR
-BUGS
-    Please report any bugs or feature requests to "bug-business-es-nif at
-    rt.cpan.org", or through the web interface at
-    <http://rt.cpan.org/NoAuth/ReportBug.html?Queue=DBIx-Fast>. I will be
-    notified, and then you'll automatically be notified of progress on your
-    bug as I make changes.
-
-SUPPORT
-    You can find documentation for this module with the perldoc command.
-
-        perldoc DBIx::Fast
-
-    You can also look for information at:
-
-    *  RT: CPAN's request tracker (report bugs here)
-
-       <http://rt.cpan.org/NoAuth/Bugs.html?Dist=DBIx-Fast>
-
-    *  MetaCPAN
-
-       <https://metacpan.org/pod/DBIx::Fast>
-
-    *  Search CPAN
-
-       <http://search.cpan.org/dist/DBIx-Fast/>
+    Harun Delgado <hdp@nurmol.com>
 
 LICENSE AND COPYRIGHT
-    This program is free software; you can redistribute it and/or modify it
-    under the terms of the the Artistic License (2.0). You may obtain a copy
-    of the full license at:
-
+    This is free software under the Artistic License 2.0.
     <http://www.perlfoundation.org/artistic_license_2_0>
-
-    Any use, modification, and distribution of the Standard or Modified
-    Versions is governed by this Artistic License. By using, modifying or
-    distributing the Package, you accept this license. Do not use, modify,
-    or distribute the Package, if you do not accept this license.
-
-    If your Modified Version has been derived from a Modified Version made
-    by someone other than you, you are nevertheless required to ensure that
-    your Modified Version complies with the requirements of this license.
-
-    This license does not grant you the right to use any trademark, service
-    mark, tradename, or logo of the Copyright Holder.
-
-    This license includes the non-exclusive, worldwide, free-of-charge
-    patent license to make, have made, use, offer to sell, sell, import and
-    otherwise transfer the Package with respect to any patent claims
-    licensable by the Copyright Holder that are necessarily infringed by the
-    Package. If you institute patent litigation (including a cross-claim or
-    counterclaim) against any party alleging that the Package constitutes
-    direct or contributory patent infringement, then this Artistic License
-    to you shall terminate on the date that such litigation is filed.
-
-    Disclaimer of Warranty: THE PACKAGE IS PROVIDED BY THE COPYRIGHT HOLDER
-    AND CONTRIBUTORS "AS IS' AND WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES.
-    THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR
-    PURPOSE, OR NON-INFRINGEMENT ARE DISCLAIMED TO THE EXTENT PERMITTED BY
-    YOUR LOCAL LAW. UNLESS REQUIRED BY LAW, NO COPYRIGHT HOLDER OR
-    CONTRIBUTOR WILL BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, OR
-    CONSEQUENTIAL DAMAGES ARISING IN ANY WAY OUT OF THE USE OF THE PACKAGE,
-    EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
